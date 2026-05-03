@@ -4,7 +4,9 @@
   "description": "Trama desktop companion app (Tauri + React)",
   "type": "module",
   "scripts": {
+    "dev:web": "vite",
     "dev": "tauri dev",
+    "build:web": "vite build",
     "build": "tsc && tauri build",
     "test": "vitest",
     "lint": "eslint src --ext .ts,.tsx",
@@ -24,6 +26,7 @@
     "react-dom": "^18.2.0"
   },
   "devDependencies": {
+    "@vitejs/plugin-react": "^4.3.4",
     "@tauri-apps/api": "^1.5.0",
     "@tauri-apps/cli": "^1.5.0",
     "@types/react": "^18.2.0",
