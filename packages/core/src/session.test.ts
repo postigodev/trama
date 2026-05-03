@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { createSession, addTrackCompletion, addTrackSkip, addFeedback } from '../session';
+import { createSession, addTrackCompletion, addTrackSkip, addFeedback } from './session';
 
 describe('@trama/core - Session Management', () => {
   it('should create a new session', () => {

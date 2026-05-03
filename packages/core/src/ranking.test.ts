@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { rankCandidates } from '../ranking';
-import type { Session, CandidateTrack } from '../types';
+import { rankCandidates } from './ranking';
+import type { Session, CandidateTrack } from './types';
 
 describe('@trama/core - Ranking Engine', () => {
   const mockCandidates: CandidateTrack[] = [
@@ -30,7 +30,7 @@ describe('@trama/core - Ranking Engine', () => {
   const mockSession: Session = {
     id: 'session-1',
     startedAt: new Date(),
-    tracks: [],
+    tracks: [mockCandidates[1]],
     completions: ['track-1'],
     skips: ['track-2'],
     feedback: { 'track-3': 'like' },
@@ -47,21 +47,31 @@ describe('@trama/core - Ranking Engine', () => {
     expect(ranked[0].reasons.length).toBeGreaterThan(0);
   });
 
-  it('should reward completed tracks', () => {
+  it('should reward completed tracks (completion affinity)', () => {
     const ranked = rankCandidates(mockCandidates, mockSession);
-    const track1 = ranked.find(c => c.id === 'track-1');
+    const track1 = ranked.find(c => c.track.id === 'track-1');
+    expect(track1?.scoreBreakdown.completionAffinity).toBeGreaterThan(0);
     expect(track1?.reasons).toContain('Matches recently completed tracks');
   });
 
-  it('should penalize skipped tracks', () => {
+  it('should penalize skipped tracks (skip risk)', () => {
     const ranked = rankCandidates(mockCandidates, mockSession);
-    const track2 = ranked.find(c => c.id === 'track-2');
-    expect(track2?.reasons).toContain('Was skipped earlier in session');
+    const track2 = ranked.find(c => c.track.id === 'track-2');
+    expect(track2?.scoreBreakdown.skipRisk).toBeLessThan(0);
+    expect(track2?.warnings).toContain('recently_skipped');
   });
 
-  it('should reward liked tracks', () => {
+  it('should apply explicit feedback reward', () => {
     const ranked = rankCandidates(mockCandidates, mockSession);
-    const track3 = ranked.find(c => c.id === 'track-3');
-    expect(track3?.reasons).toContain('Matches your feedback');
+    const track3 = ranked.find(c => c.track.id === 'track-3');
+    expect(track3?.scoreBreakdown.explicitFeedback).toBeGreaterThan(0);
+    expect(track3?.reasons).toContain('Matches your positive feedback');
+  });
+
+  it('should apply recent repeat penalty', () => {
+    const ranked = rankCandidates(mockCandidates, mockSession);
+    const track2 = ranked.find(c => c.track.id === 'track-2');
+    expect(track2?.scoreBreakdown.recentRepeatRisk).toBeLessThan(0);
+    expect(track2?.warnings).toContain('recent_repeat');
   });
 });

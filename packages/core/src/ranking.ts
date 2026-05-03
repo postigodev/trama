@@ -2,56 +2,116 @@
  * Ranking engine - score candidates based on session context
  */
 
-import type { Session, CandidateTrack, RankedCandidate } from './types';
+import type {
+  Session,
+  CandidateTrack,
+  RankedCandidate,
+  RankingConfig,
+  ScoreBreakdown,
+  RecommendationWarning,
+} from './types';
+import { defaultRankingConfig } from './types';
 
 export function rankCandidates(
   candidates: CandidateTrack[],
-  session: Session
+  session: Session,
+  config: RankingConfig = defaultRankingConfig
 ): RankedCandidate[] {
   return candidates
-    .map(candidate => ({
-      ...candidate,
-      score: scoreCandidate(candidate, session),
-      reasons: getReasons(candidate, session),
-    }))
+    .map((candidate): RankedCandidate => {
+      const scoreBreakdown = scoreCandidate(candidate, session, config);
+
+      return {
+        track: candidate,
+        score: scoreBreakdown.total,
+        scoreBreakdown,
+        reasons: getReasons(scoreBreakdown),
+        warnings: getWarnings(candidate, session),
+      };
+    })
     .sort((a, b) => b.score - a.score);
 }
 
-function scoreCandidate(candidate: CandidateTrack, session: Session): number {
-  let score = 0;
+function scoreCandidate(
+  candidate: CandidateTrack,
+  session: Session,
+  config: RankingConfig
+): ScoreBreakdown {
+  let completionAffinity = 0;
+  let skipRisk = 0;
+  let recentRepeatRisk = 0;
+  let explicitFeedback = 0;
 
-  // Completion reward
   if (session.completions.includes(candidate.id)) {
-    score += 10;
+    completionAffinity += config.completionReward;
   }
 
-  // Skip penalty
   if (session.skips.includes(candidate.id)) {
-    score -= 20;
+    skipRisk -= config.skipPenalty;
   }
 
-  // Feedback
-  const feedback = session.feedback[candidate.id];
-  if (feedback === 'like') score += 15;
-  if (feedback === 'dislike') score -= 15;
+  if (session.tracks.some(track => track.id === candidate.id)) {
+    recentRepeatRisk -= config.repeatPenalty;
+  }
 
-  return score;
+  const feedback = session.feedback[candidate.id];
+  if (feedback === 'like') explicitFeedback += config.feedbackWeight;
+  if (feedback === 'dislike') explicitFeedback -= config.feedbackWeight;
+
+  const total = completionAffinity + skipRisk + recentRepeatRisk + explicitFeedback;
+
+  return {
+    completionAffinity,
+    skipRisk,
+    recentRepeatRisk,
+    explicitFeedback,
+    total,
+  };
 }
 
-function getReasons(candidate: CandidateTrack, session: Session): string[] {
+function getReasons(scoreBreakdown: ScoreBreakdown): string[] {
   const reasons: string[] = [];
 
-  if (session.completions.includes(candidate.id)) {
+  if (scoreBreakdown.completionAffinity > 0) {
     reasons.push('Matches recently completed tracks');
   }
 
-  if (session.skips.includes(candidate.id)) {
-    reasons.push('Was skipped earlier in session');
+  if (scoreBreakdown.recentRepeatRisk < 0) {
+    reasons.push('Played recently in this session');
   }
 
-  const feedback = session.feedback[candidate.id];
-  if (feedback === 'like') reasons.push('Matches your feedback');
-  if (feedback === 'dislike') reasons.push('Avoided based on feedback');
+  if (scoreBreakdown.explicitFeedback > 0) {
+    reasons.push('Matches your positive feedback');
+  }
+
+  if (scoreBreakdown.explicitFeedback < 0) {
+    reasons.push('Negative feedback lowers this recommendation');
+  }
+
+  if (scoreBreakdown.skipRisk < 0) {
+    reasons.push('Artist or track was skipped earlier in session');
+  }
 
   return reasons;
+}
+
+function getWarnings(
+  candidate: CandidateTrack,
+  session: Session
+): RecommendationWarning[] {
+  const warnings: RecommendationWarning[] = [];
+
+  if (session.skips.includes(candidate.id)) {
+    warnings.push('recently_skipped');
+  }
+
+  if (session.tracks.some(track => track.id === candidate.id)) {
+    warnings.push('recent_repeat');
+  }
+
+  if (session.feedback[candidate.id] === 'dislike') {
+    warnings.push('negative_feedback');
+  }
+
+  return warnings;
 }

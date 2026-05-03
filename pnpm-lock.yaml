@@ -20,6 +20,9 @@ importers:
       eslint:
         specifier: ^8.57.1
         version: 8.57.1
+      vitest:
+        specifier: ^1.6.1
+        version: 1.6.1(@types/node@20.19.39)
 
   apps/desktop:
     dependencies:
