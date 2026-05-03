@@ -8,10 +8,10 @@ export interface SpotifyClient {
   addToQueue: (trackId: string) => Promise<void>;
 }
 
-export function createSpotifyClient(accessToken: string): SpotifyClient {
+export function createSpotifyClient(_accessToken: string): SpotifyClient {
   return {
     getCurrentPlayback: async () => null,
     getRecentlyPlayed: async () => [],
-    addToQueue: async (trackId: string) => {},
+    addToQueue: async (_trackId: string) => {},
   };
 }

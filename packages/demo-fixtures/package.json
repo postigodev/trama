@@ -16,7 +16,8 @@
     "build": "tsc",
     "test": "vitest",
     "lint": "eslint src --ext .ts,.tsx",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "clean": "rm -rf dist"
   },
   "keywords": ["trama", "demo", "fixtures"],
   "author": "postigodev",

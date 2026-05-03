@@ -5,7 +5,7 @@
 
 import React from 'react';
 
-export function App() {
+export function App(): React.JSX.Element {
   return (
     <div className="app">
       <h1>Trama</h1>

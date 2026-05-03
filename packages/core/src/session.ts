@@ -2,7 +2,7 @@
  * Session management and state tracking
  */
 
-import type { Session, CandidateTrack } from './types';
+import type { Session } from './types';
 
 export function createSession(id: string): Session {
   return {

@@ -12,8 +12,8 @@ export function initializeDatabase(): Database {
   // Placeholder for database initialization
   // Will be implemented with better-sqlite3
   return {
-    prepare: (sql: string) => null,
-    exec: (sql: string) => {},
+    prepare: (_sql: string) => null,
+    exec: (_sql: string) => {},
     close: () => {},
   };
 }

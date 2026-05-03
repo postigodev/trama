@@ -8,7 +8,8 @@
     "build": "tsc && tauri build",
     "test": "vitest",
     "lint": "eslint src --ext .ts,.tsx",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "clean": "rm -rf dist"
   },
   "keywords": ["trama", "desktop", "tauri", "react"],
   "author": "postigodev",

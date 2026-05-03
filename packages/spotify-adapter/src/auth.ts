@@ -8,14 +8,14 @@ export interface SpotifyAuthConfig {
   scopes?: string[];
 }
 
-export function generateAuthorizationUrl(config: SpotifyAuthConfig): string {
+export function generateAuthorizationUrl(_config: SpotifyAuthConfig): string {
   // Placeholder for OAuth URL generation
   return '';
 }
 
 export async function exchangeCode(
-  code: string,
-  config: SpotifyAuthConfig
+  _code: string,
+  _config: SpotifyAuthConfig
 ): Promise<string> {
   // Placeholder for token exchange
   return '';
