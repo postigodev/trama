@@ -2,6 +2,19 @@
 
 **Trama is an open-source, local-first adaptive queue engine for music sessions.**
 
+## Quick start
+
+```bash
+git clone https://github.com/postigodev/trama.git
+cd trama
+pnpm install
+pnpm dev
+```
+
+See `docs/setup.md` for detailed setup instructions.
+
+## What is Trama?
+
 Most music apps are good at modeling your long-term taste.
 
 Trama focuses on something more immediate: **the structure of the current listening session**.

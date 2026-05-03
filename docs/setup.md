@@ -1,6 +1,6 @@
-# Este archivo se movió a /docs
+# Local Development Setup
 
-Ver: `/docs/local-dev-setup.md`
+This guide walks you through setting up Trama for local development.
 
 ---
 

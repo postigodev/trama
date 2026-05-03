@@ -1,0 +1,26 @@
+{
+  "extends": ".",
+  "compilerOptions": {
+    "target": "ES2020",
+    "useDefineForClassFields": true,
+    "lib": ["ES2020", "DOM", "DOM.Iterable"],
+    "module": "ESNext",
+    "skipLibCheck": true,
+    "strict": true,
+    "resolveJsonModule": true,
+    "declaration": true,
+    "declarationMap": true,
+    "sourceMap": true,
+    "noEmit": true,
+    "baseUrl": ".",
+    "paths": {
+      "@trama/core": ["packages/core/src"],
+      "@trama/db": ["packages/db/src"],
+      "@trama/spotify-adapter": ["packages/spotify-adapter/src"],
+      "@trama/demo-fixtures": ["packages/demo-fixtures/src"],
+      "@trama/shared": ["packages/shared/src"]
+    }
+  },
+  "include": ["packages", "apps"],
+  "exclude": ["node_modules", "**/*.spec.ts", "**/*.test.ts"]
+}
