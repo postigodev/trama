@@ -4,6 +4,14 @@
 
 export type FeedbackType = 'like' | 'dislike';
 
+export type PlayEventType =
+  | 'track_started'
+  | 'track_completed'
+  | 'track_skipped'
+  | 'track_replayed';
+
+export type FeedbackEventType = 'more_like_this' | 'less_like_this';
+
 export interface CandidateTrack {
   id: string;
   title: string;
@@ -19,6 +27,22 @@ export interface Session {
   completions: string[];
   skips: string[];
   feedback: Record<string, FeedbackType>;
+}
+
+export interface PlayEvent {
+  id: string;
+  sessionId: string;
+  trackId: string;
+  type: PlayEventType;
+  occurredAt: string;
+}
+
+export interface FeedbackEvent {
+  id: string;
+  sessionId: string;
+  trackId: string;
+  type: FeedbackEventType;
+  occurredAt: string;
 }
 
 export interface RankingConfig {

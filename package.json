@@ -17,7 +17,7 @@
     "typecheck": "pnpm -r typecheck",
     "clean": "pnpm -r clean",
     "format": "prettier --write .",
-    "prepare": "husky install"
+    "prepare": "husky"
   },
   "keywords": [
     "music",

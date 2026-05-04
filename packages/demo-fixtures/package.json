@@ -22,6 +22,9 @@
   "keywords": ["trama", "demo", "fixtures"],
   "author": "postigodev",
   "license": "MIT",
+  "dependencies": {
+    "@trama/core": "workspace:*"
+  },
   "devDependencies": {
     "@types/node": "^20.0.0",
     "typescript": "^5.3.0",
