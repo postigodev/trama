@@ -8,6 +8,8 @@ coverage/
 .turbo/
 .vercel/
 .railway/
+target/
+**/target/
 
 .env
 .env.*

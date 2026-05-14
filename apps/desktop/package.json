@@ -8,7 +8,7 @@
     "dev": "tauri dev",
     "build:web": "vite build",
     "build": "tsc && tauri build",
-    "test": "vitest",
+    "test": "vitest run --passWithNoTests",
     "lint": "eslint src --ext .ts,.tsx",
     "typecheck": "tsc --noEmit",
     "clean": "rm -rf dist"

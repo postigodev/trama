@@ -1,7 +1,16 @@
 node_modules/
 dist/
 build/
+coverage/
+.cache/
+.turbo/
+.vercel/
+.railway/
+target/
+**/target/
 .DS_Store
+.env
+.env.*
 .env.local
 .env.*.local
 *.log
@@ -12,3 +21,5 @@ pnpm-debug.log*
 lerna-debug.log*
 trama.db
 .sqlite
+*.sqlite
+*.db

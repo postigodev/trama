@@ -10,12 +10,12 @@
     }
   },
   "scripts": {
-    "dev": "pnpm -C apps/desktop dev",
-    "build": "pnpm -r build",
-    "test": "pnpm -r test",
-    "lint": "pnpm -r lint",
-    "typecheck": "pnpm -r typecheck",
-    "clean": "pnpm -r clean",
+    "dev": "corepack pnpm -C apps/desktop dev",
+    "build": "corepack pnpm -r build",
+    "test": "corepack pnpm -r test",
+    "lint": "corepack pnpm -r lint",
+    "typecheck": "corepack pnpm -r typecheck",
+    "clean": "corepack pnpm -r clean",
     "format": "prettier --write .",
     "prepare": "husky"
   },

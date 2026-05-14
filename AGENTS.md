@@ -630,6 +630,20 @@ what boundaries were preserved
 
 ---
 
+## Agent workflow hygiene
+
+Prefer targeted file reads over broad repo scans.
+
+Use ripgrep/search before opening large files.
+
+Do not read generated files, dependency folders, build outputs, binaries, datasets, or lockfiles unless explicitly necessary.
+
+Keep responses concise.
+
+When blocked, ask for the smallest missing context instead of scanning the whole repo.
+
+---
+
 ## Coding style
 
 Use TypeScript for shared app logic.
