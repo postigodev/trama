@@ -1,22 +1,23 @@
 /**
- * Demo scenarios for different listening contexts
+ * Demo scenarios for different listening contexts.
  */
 
 import type {
   CandidateTrack,
   FeedbackEvent,
+  PlayEvent,
   RankingConfig,
   Session,
-  PlayEvent,
+  Track,
 } from '../../core/src/types';
-import { defaultRankingConfig } from '../../core/src/types';
-import { mockTracks } from './fixtures';
+import { defaultRankingConfig, defaultSessionControls } from '../../core/src/types';
+import { getTrackById, toCandidate } from './fixtures';
 
 export interface DemoScenario {
   id: string;
   name: string;
   description: string;
-  currentTrack: CandidateTrack;
+  currentTrack: Track;
   session: Session;
   candidates: CandidateTrack[];
   recentPlayEvents: PlayEvent[];
@@ -25,37 +26,65 @@ export interface DemoScenario {
   expectedBehaviorNotes: string[];
 }
 
-const trackById = (id: string): CandidateTrack => {
-  const track = mockTracks.find(item => item.id === id);
-  if (!track) {
-    throw new Error(`Track not found for scenario fixture: ${id}`);
-  }
-  return track;
-};
+const sessionBase = (input: Partial<Session> & Pick<Session, 'id'>): Session => ({
+  status: 'active',
+  mode: 'demo',
+  startedAt: '2026-01-01T00:00:00.000Z',
+  updatedAt: '2026-01-01T00:00:00.000Z',
+  recentTrackIds: [],
+  completedTrackIds: [],
+  skippedTrackIds: [],
+  replayedTrackIds: [],
+  acceptedArtistIds: [],
+  rejectedArtistIds: [],
+  acceptedTags: [],
+  rejectedTags: [],
+  feedbackByTrack: {},
+  controls: { ...defaultSessionControls },
+  ...input,
+});
+
+const eventBase = (
+  input: Omit<PlayEvent, 'inferred'>
+): PlayEvent => ({
+  inferred: false,
+  ...input,
+});
 
 export const scenarios: DemoScenario[] = [
   {
     id: 'late-night-melodic-session',
     name: 'Late-night melodic session',
     description: 'Introspective and cohesive melodic flow',
-    currentTrack: trackById('late-1'),
-    session: {
+    currentTrack: getTrackById('late-1'),
+    session: sessionBase({
       id: 'session-late-night',
-      startedAt: new Date('2026-01-01T23:30:00.000Z'),
-      tracks: [trackById('late-1')],
-      completions: ['late-1'],
-      skips: ['break-1'],
-      feedback: { 'late-2': 'like', 'break-2': 'dislike' },
-    },
-    candidates: [trackById('late-2'), trackById('break-1'), trackById('study-2')],
+      currentTrackId: 'late-1',
+      recentTrackIds: ['late-1'],
+      completedTrackIds: ['late-1'],
+      skippedTrackIds: ['break-1'],
+      acceptedArtistIds: ['artist-luna-waves'],
+      rejectedArtistIds: ['artist-noise-vessel'],
+      acceptedTags: ['late-night', 'melodic', 'dark', 'synth'],
+      rejectedTags: ['abrasive', 'bright', 'drop'],
+      feedbackByTrack: {
+        'late-2': ['more_like_this'],
+        'break-2': ['less_like_this'],
+      },
+    }),
+    candidates: [
+      toCandidate(getTrackById('late-2'), 'playlist_adjacency'),
+      toCandidate(getTrackById('break-1')),
+      toCandidate(getTrackById('study-2')),
+    ],
     recentPlayEvents: [
-      {
+      eventBase({
         id: 'evt-ln-1',
         sessionId: 'session-late-night',
         trackId: 'late-1',
         type: 'track_completed',
         occurredAt: '2026-01-01T23:40:00.000Z',
-      },
+      }),
     ],
     feedbackEvents: [
       {
@@ -75,56 +104,71 @@ export const scenarios: DemoScenario[] = [
     id: 'gym-session',
     name: 'Gym session',
     description: 'High-energy set where familiarity can be acceptable',
-    currentTrack: trackById('gym-1'),
-    session: {
+    currentTrack: getTrackById('gym-1'),
+    session: sessionBase({
       id: 'session-gym',
-      startedAt: new Date('2026-01-02T07:00:00.000Z'),
-      tracks: [trackById('gym-1')],
-      completions: ['gym-1'],
-      skips: [],
-      feedback: {},
-    },
-    candidates: [trackById('gym-1'), trackById('gym-2'), trackById('study-1')],
+      currentTrackId: 'gym-1',
+      recentTrackIds: ['gym-1'],
+      completedTrackIds: ['gym-1'],
+      replayedTrackIds: ['gym-1'],
+      acceptedArtistIds: ['artist-city-beats'],
+      acceptedTags: ['gym', 'high-energy', 'percussive'],
+      controls: {
+        ...defaultSessionControls,
+        repeatTolerance: 0.8,
+      },
+    }),
+    candidates: [
+      toCandidate(getTrackById('gym-1')),
+      toCandidate(getTrackById('gym-2'), 'playlist_cooccurrence'),
+      toCandidate(getTrackById('study-1')),
+    ],
     recentPlayEvents: [
-      {
+      eventBase({
         id: 'evt-gym-1',
         sessionId: 'session-gym',
         trackId: 'gym-1',
         type: 'track_replayed',
         occurredAt: '2026-01-02T07:08:00.000Z',
-      },
+      }),
     ],
     feedbackEvents: [],
     config: {
       ...defaultRankingConfig,
-      repeatPenalty: 2,
+      repeatTolerance: 0.8,
     },
     expectedBehaviorNotes: [
-      'Lower repeat penalty should make familiar repeats less punished.',
+      'Higher repeat tolerance should make familiar repeats less punished.',
     ],
   },
   {
     id: 'study-session',
     name: 'Study session',
     description: 'Low-distraction ambient flow',
-    currentTrack: trackById('study-1'),
-    session: {
+    currentTrack: getTrackById('study-1'),
+    session: sessionBase({
       id: 'session-study',
-      startedAt: new Date('2026-01-02T14:00:00.000Z'),
-      tracks: [trackById('study-1')],
-      completions: ['study-1'],
-      skips: ['break-2'],
-      feedback: { 'study-2': 'like' },
-    },
-    candidates: [trackById('study-2'), trackById('late-2'), trackById('break-2')],
+      currentTrackId: 'study-1',
+      recentTrackIds: ['study-1'],
+      completedTrackIds: ['study-1'],
+      skippedTrackIds: ['break-2'],
+      acceptedTags: ['study', 'ambient', 'low-pressure'],
+      rejectedTags: ['abrasive', 'bright', 'drop'],
+      feedbackByTrack: { 'study-2': ['more_like_this'] },
+    }),
+    candidates: [
+      toCandidate(getTrackById('study-2'), 'playlist_adjacency'),
+      toCandidate(getTrackById('late-2')),
+      toCandidate(getTrackById('break-2')),
+    ],
     recentPlayEvents: [
-      {
+      eventBase({
         id: 'evt-study-1',
         sessionId: 'session-study',
         trackId: 'study-1',
         type: 'track_completed',
         occurredAt: '2026-01-02T14:20:00.000Z',
-      },
+      }),
     ],
     feedbackEvents: [
       {
@@ -143,31 +187,40 @@ export const scenarios: DemoScenario[] = [
     id: 'broken-session-many-skips',
     name: 'Broken session with many skips',
     description: 'Session with rejection-heavy behavior',
-    currentTrack: trackById('break-1'),
-    session: {
+    currentTrack: getTrackById('break-1'),
+    session: sessionBase({
       id: 'session-broken',
-      startedAt: new Date('2026-01-03T19:30:00.000Z'),
-      tracks: [trackById('break-1'), trackById('break-2')],
-      completions: [],
-      skips: ['break-1', 'break-2', 'gym-2'],
-      feedback: { 'break-2': 'dislike', 'late-1': 'like' },
-    },
-    candidates: [trackById('break-2'), trackById('gym-2'), trackById('late-1')],
+      currentTrackId: 'break-1',
+      recentTrackIds: ['break-2', 'break-1'],
+      skippedTrackIds: ['break-1', 'break-2', 'gym-2'],
+      rejectedArtistIds: ['artist-noise-vessel', 'artist-glitch-unit'],
+      rejectedTags: ['abrasive', 'bright', 'drop', 'gym', 'high-energy'],
+      acceptedTags: ['late-night', 'melodic'],
+      feedbackByTrack: {
+        'break-2': ['less_like_this'],
+        'late-1': ['more_like_this'],
+      },
+    }),
+    candidates: [
+      toCandidate(getTrackById('break-2')),
+      toCandidate(getTrackById('gym-2')),
+      toCandidate(getTrackById('late-1')),
+    ],
     recentPlayEvents: [
-      {
+      eventBase({
         id: 'evt-broken-1',
         sessionId: 'session-broken',
         trackId: 'break-1',
         type: 'track_skipped',
         occurredAt: '2026-01-03T19:31:00.000Z',
-      },
-      {
+      }),
+      eventBase({
         id: 'evt-broken-2',
         sessionId: 'session-broken',
         trackId: 'break-2',
         type: 'track_skipped',
         occurredAt: '2026-01-03T19:34:00.000Z',
-      },
+      }),
     ],
     feedbackEvents: [
       {

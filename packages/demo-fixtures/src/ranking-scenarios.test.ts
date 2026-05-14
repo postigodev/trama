@@ -47,7 +47,7 @@ describe('@trama/demo-fixtures - scenario ranking behavior', () => {
 
     expect(skipped).toBeDefined();
     expect(recovered).toBeDefined();
-    expect(skipped!.warnings).toContain('recently_skipped');
+    expect(skipped!.warnings.some(warning => warning.type === 'skip_risk')).toBe(true);
     expect(skipped!.score).toBeLessThan(recovered!.score);
   });
 
@@ -66,7 +66,9 @@ describe('@trama/demo-fixtures - scenario ranking behavior', () => {
 
     expect(familiar).toBeDefined();
     expect(study).toBeDefined();
-    expect(familiar!.scoreBreakdown.recentRepeatRisk).toBeGreaterThanOrEqual(-2);
+    expect(
+      familiar!.scoreBreakdown.components.recentRepeatRisk.contribution
+    ).toBeGreaterThanOrEqual(-0.04);
     expect(familiar!.score).toBeGreaterThan(study!.score);
   });
 
@@ -85,7 +87,7 @@ describe('@trama/demo-fixtures - scenario ranking behavior', () => {
 
     expect(liked).toBeDefined();
     expect(skipped).toBeDefined();
-    expect(liked!.scoreBreakdown.explicitFeedback).toBeGreaterThan(0);
+    expect(liked!.scoreBreakdown.components.explicitFeedback.raw).toBeGreaterThan(0);
     expect(liked!.score).toBeGreaterThan(skipped!.score);
   });
 });
