@@ -22,19 +22,29 @@
       "error",
       { "allowExpressions": true }
     ],
-    "no-restricted-imports": [
-      "error",
-      {
-        "patterns": [
+    "no-restricted-imports": "off"
+  },
+  "overrides": [
+    {
+      "files": ["packages/core/src/**/*.ts"],
+      "rules": {
+        "no-restricted-imports": [
+          "error",
           {
-            "group": ["@trama/spotify-adapter"],
-            "message": "@trama/spotify-adapter cannot be imported in @trama/core"
+            "patterns": [
+              {
+                "group": ["@trama/spotify-adapter"],
+                "message": "@trama/spotify-adapter cannot be imported in @trama/core"
+              },
+              {
+                "group": ["@trama/db"],
+                "message": "@trama/db cannot be imported in @trama/core"
+              }
+            ]
           }
         ]
       }
-    ]
-  },
-  "overrides": [
+    },
     {
       "files": ["**/*.test.ts", "**/*.spec.ts"],
       "rules": {
