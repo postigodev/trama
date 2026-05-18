@@ -42,6 +42,10 @@ export interface SpotifyTokenResponse {
   scope?: string;
 }
 
+export interface SpotifyRefreshTokenInput extends SpotifyAuthConfig {
+  refreshToken: string;
+}
+
 export interface TokenExchangeOptions {
   fetch?: typeof fetch;
 }
@@ -150,6 +154,43 @@ export async function exchangeCode(
   };
 }
 
+export async function refreshAccessToken(
+  input: SpotifyRefreshTokenInput,
+  options: TokenExchangeOptions = {}
+): Promise<SpotifyTokenResponse> {
+  validateAuthConfig(input);
+  if (input.refreshToken.trim().length === 0) {
+    throw new Error('Spotify refresh token is required');
+  }
+
+  const fetchImpl = options.fetch ?? fetch;
+  const response = await fetchImpl(spotifyTokenUrl, {
+    method: 'POST',
+    headers: {
+      'content-type': 'application/x-www-form-urlencoded',
+    },
+    body: new URLSearchParams({
+      grant_type: 'refresh_token',
+      refresh_token: input.refreshToken,
+      client_id: input.clientId,
+    }),
+  });
+
+  if (!response.ok) {
+    throw new Error(`Spotify token refresh failed with status ${response.status}`);
+  }
+
+  const token = (await response.json()) as SpotifyTokenApiResponse;
+
+  return {
+    accessToken: token.access_token,
+    tokenType: token.token_type,
+    expiresIn: token.expires_in,
+    refreshToken: token.refresh_token,
+    scope: token.scope,
+  };
+}
+
 export function extractAuthorizationCode(codeOrCallbackUrl: string): string {
   const trimmed = codeOrCallbackUrl.trim();
   if (trimmed.length === 0) {
@@ -216,10 +257,27 @@ function getCrypto(): Crypto {
 
 function base64UrlEncode(bytes: Uint8Array): string {
   const binary = [...bytes].map(byte => String.fromCharCode(byte)).join('');
-  const encoded =
-    typeof btoa === 'function'
-      ? btoa(binary)
-      : Buffer.from(binary, 'binary').toString('base64');
+  const encoded = encodeBase64(binary);
 
   return encoded.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/g, '');
+}
+
+function encodeBase64(binary: string): string {
+  if (typeof btoa === 'function') {
+    return btoa(binary);
+  }
+
+  const nodeBuffer = (
+    globalThis as {
+      Buffer?: {
+        from(input: string, encoding: 'binary'): { toString(encoding: 'base64'): string };
+      };
+    }
+  ).Buffer;
+
+  if (!nodeBuffer) {
+    throw new Error('Base64 encoding is unavailable in this runtime');
+  }
+
+  return nodeBuffer.from(binary, 'binary').toString('base64');
 }

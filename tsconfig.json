@@ -15,6 +15,7 @@
     "noEmit": true,
     "baseUrl": ".",
     "paths": {
+      "@/*": ["apps/desktop/src/*"],
       "@trama/core": ["packages/core/src"],
       "@trama/db": ["packages/db/src"],
       "@trama/spotify-adapter": ["packages/spotify-adapter/src"],

@@ -4,6 +4,7 @@ import {
   exchangeCode,
   extractAuthorizationCode,
   generateAuthorizationUrl,
+  refreshAccessToken,
   statusSummary,
 } from './auth';
 
@@ -97,6 +98,44 @@ describe('@trama/spotify-adapter - PKCE auth helpers', () => {
       tokenType: 'Bearer',
       expiresIn: 3600,
       refreshToken: 'refresh-token',
+      scope: 'user-read-playback-state',
+    });
+  });
+
+  it('refreshes an access token without a client secret', async () => {
+    const calls: Array<{ url: string; body: URLSearchParams }> = [];
+    const fetchImpl: typeof fetch = async (url, init) => {
+      calls.push({
+        url: url.toString(),
+        body: init?.body as URLSearchParams,
+      });
+
+      return new Response(
+        JSON.stringify({
+          access_token: 'new-access-token',
+          token_type: 'Bearer',
+          expires_in: 3600,
+          scope: 'user-read-playback-state',
+        }),
+        { status: 200 }
+      );
+    };
+
+    const token = await refreshAccessToken(
+      { ...config, refreshToken: 'refresh-token' },
+      { fetch: fetchImpl }
+    );
+
+    expect(calls).toHaveLength(1);
+    expect(calls[0].url).toBe('https://accounts.spotify.com/api/token');
+    expect(calls[0].body.get('grant_type')).toBe('refresh_token');
+    expect(calls[0].body.get('refresh_token')).toBe('refresh-token');
+    expect(calls[0].body.get('client_id')).toBe('spotify-client-id');
+    expect(calls[0].body.has('client_secret')).toBe(false);
+    expect(token).toEqual({
+      accessToken: 'new-access-token',
+      tokenType: 'Bearer',
+      expiresIn: 3600,
       scope: 'user-read-playback-state',
     });
   });

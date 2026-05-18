@@ -166,6 +166,21 @@ SPOTIFY_REDIRECT_URI=http://127.0.0.1:5173/auth/spotify/callback
 
 The exact redirect URI can change depending on Tauri implementation.
 
+Current desktop Lab Mode behavior:
+
+```txt
+1. User enters their Spotify Client ID.
+2. Trama creates a PKCE authorization URL.
+3. User approves in Spotify.
+4. User pastes the callback URL or code into Trama.
+5. Trama validates callback state.
+6. Trama exchanges the code for a token.
+7. Trama saves the token in the local Tauri app data directory.
+```
+
+The current implementation does not use a client secret and does not display
+token values in the UI.
+
 ---
 
 ## Development mode constraints
@@ -535,7 +550,24 @@ use OS keychain/credential manager if available
 fallback to local encrypted storage only if necessary
 ```
 
-The exact implementation should be decided during development.
+Current desktop Lab Mode behavior:
+
+```txt
+token cache file: spotify-token.json in the Tauri app data directory
+stored fields: access token, token type, expiry time, optional refresh token, scope, saved time
+clear action: available in the Spotify Auth Lab panel
+```
+
+This is suitable for local development smoke testing, but before a broader
+release Trama should review whether to move token storage to the OS credential
+store.
+
+Refresh behavior:
+
+```txt
+If the access token is expired or near expiry, Trama refreshes it with the
+stored refresh token before reading playback state.
+```
 
 ---
 

@@ -5,6 +5,7 @@ export default defineConfig({
   plugins: [react()],
   resolve: {
     alias: {
+      '@': new URL('./src', import.meta.url).pathname,
       '@trama/core': new URL('../../packages/core/src', import.meta.url).pathname,
       '@trama/db': new URL('../../packages/db/src', import.meta.url).pathname,
       '@trama/demo-fixtures': new URL(

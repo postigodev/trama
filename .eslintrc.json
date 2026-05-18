@@ -50,6 +50,18 @@
       "rules": {
         "@typescript-eslint/explicit-function-return-type": "off"
       }
+    },
+    {
+      "files": ["apps/desktop/src/**/*.ts", "apps/desktop/src/**/*.tsx"],
+      "env": {
+        "browser": true
+      }
+    },
+    {
+      "files": ["apps/desktop/src/components/ui/**/*.tsx"],
+      "rules": {
+        "@typescript-eslint/explicit-function-return-type": "off"
+      }
     }
   ]
 }
