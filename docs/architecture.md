@@ -381,7 +381,9 @@ local OS media session observer
         ↓
 normalized ObservedPlayback
         ↓
-local event inference and event log
+local event inference
+        ↓
+event timeline / local event log
         ↓
 core session/ranking engine
         ↓
@@ -413,6 +415,22 @@ Spotify Web API:
 The Web Playback SDK is not the default path because it turns Trama into a
 Spotify Connect playback device and does not expose Spotify Mix transition
 controls.
+
+The first desktop implementation keeps inferred events in memory and shows them
+in Lab Mode. Persistence should come after the inference behavior is useful
+enough to trust.
+
+Early event inference should prefer conservative, explainable heuristics:
+
+```txt
+same track + play state change -> pause/resume event
+track change near the end -> completed event + next started event
+track change early -> skipped event + next started event
+recent track returns -> replayed event
+```
+
+Each inferred event should carry enough detail for Lab Mode to explain it:
+progress, duration, source, timestamp, and confidence.
 
 ---
 

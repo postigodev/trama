@@ -1369,6 +1369,28 @@ track_replayed
 
 Inference should include confidence when appropriate.
 
+Initial desktop heuristics:
+
+```txt
+track_completed:
+  inferred when a track changes after roughly 85% progress
+  or with 15 seconds or less remaining
+
+track_skipped:
+  inferred when a track changes after at least 10 seconds
+  but before roughly 50% progress
+
+track_replayed:
+  inferred when a recently observed track appears again
+```
+
+These thresholds should remain visible and adjustable as Trama learns from real
+sessions. They are session signals, not objective judgments about the music.
+
+Early desktop builds may keep inferred events in memory before writing them to
+the database. That is acceptable while the observer is being validated, as long
+as the event shape still matches the future persisted model.
+
 ---
 
 # Data privacy

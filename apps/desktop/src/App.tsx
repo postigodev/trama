@@ -3,7 +3,7 @@
  * Main entry point
  */
 
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Activity, Headphones, Radio, RotateCcw } from 'lucide-react';
 import type { PlaybackState } from '@trama/spotify-adapter';
 import { Badge } from '@/components/ui/badge';
@@ -16,6 +16,7 @@ import {
   CardTitle,
 } from '@/components/ui/card';
 import { LiamPanel } from '@/components/LiamPanel';
+import { EventTimeline } from '@/components/EventTimeline';
 import { SpotifyAuthLab } from '@/components/SpotifyAuthLab';
 import { UpNextPanel } from '@/components/UpNextPanel';
 import { WaveformBars } from '@/components/WaveformBars';
@@ -23,6 +24,10 @@ import {
   getCurrentMediaSession,
   type ObservedPlayback,
 } from '@/services/mediaSessionCommands';
+import {
+  inferPlaybackEvents,
+  type PlaybackEvent,
+} from '@/services/playbackEvents';
 
 export function App(): React.JSX.Element {
   const [connected, setConnected] = useState(false);
@@ -33,7 +38,12 @@ export function App(): React.JSX.Element {
     null
   );
   const [readingLocalSession, setReadingLocalSession] = useState(false);
+  const [localObserverEnabled, setLocalObserverEnabled] = useState(true);
+  const [playbackEvents, setPlaybackEvents] = useState<PlaybackEvent[]>([]);
+  const observedPlaybackRef = useRef<ObservedPlayback | null>(null);
+  const playbackEventsRef = useRef<PlaybackEvent[]>([]);
   const hasTrack = Boolean(playback?.track);
+  const hasObservedTrack = hasTrack || Boolean(observedPlayback?.title);
   const displayTitle =
     playback?.track?.title ?? observedPlayback?.title ?? 'No track selected';
   const displayArtist =
@@ -57,13 +67,43 @@ export function App(): React.JSX.Element {
     setLocalObserverError(null);
 
     try {
-      setObservedPlayback(await getCurrentMediaSession());
+      const previous = observedPlaybackRef.current;
+      const next = await getCurrentMediaSession();
+      observedPlaybackRef.current = next;
+      setObservedPlayback(next);
+
+      const newEvents = inferPlaybackEvents(previous, next, {
+        recentEvents: playbackEventsRef.current,
+      });
+      if (newEvents.length > 0) {
+        const updatedEvents = [...newEvents, ...playbackEventsRef.current].slice(
+          0,
+          12
+        );
+        playbackEventsRef.current = updatedEvents;
+        setPlaybackEvents(updatedEvents);
+      }
     } catch (error) {
       setLocalObserverError(error instanceof Error ? error.message : String(error));
     } finally {
       setReadingLocalSession(false);
     }
   }
+
+  useEffect(() => {
+    if (!localObserverEnabled) {
+      return undefined;
+    }
+
+    void readLocalMediaSession();
+    const intervalId = window.setInterval(() => {
+      void readLocalMediaSession();
+    }, 2500);
+
+    return () => {
+      window.clearInterval(intervalId);
+    };
+  }, [localObserverEnabled]);
 
   return (
     <div className="dark min-h-screen bg-background text-foreground">
@@ -80,6 +120,9 @@ export function App(): React.JSX.Element {
                 <Badge variant={observedPlayback ? 'secondary' : 'outline'}>
                   {observedPlayback ? 'Local observer ready' : 'Local observer idle'}
                 </Badge>
+                <Badge variant={localObserverEnabled ? 'secondary' : 'outline'}>
+                  {localObserverEnabled ? 'Observer loop on' : 'Observer loop off'}
+                </Badge>
               </div>
               <p className="max-w-2xl text-sm text-muted-foreground">
                 Local-first adaptive queue engine. First we observe the session,
@@ -90,7 +133,7 @@ export function App(): React.JSX.Element {
             <div className="flex items-center gap-2 text-sm text-muted-foreground">
               <Activity data-icon="inline-start" />
               <span>
-                {hasTrack || observedPlayback
+                {hasObservedTrack
                   ? 'Live playback observed'
                   : 'Waiting for playback'}
               </span>
@@ -174,6 +217,13 @@ export function App(): React.JSX.Element {
                   <RotateCcw data-icon="inline-start" />
                   Read local session
                 </Button>
+                <Button
+                  variant={localObserverEnabled ? 'secondary' : 'outline'}
+                  size="sm"
+                  onClick={() => setLocalObserverEnabled(enabled => !enabled)}
+                >
+                  {localObserverEnabled ? 'Stop observer' : 'Start observer'}
+                </Button>
               </div>
             </div>
           </div>
@@ -181,7 +231,7 @@ export function App(): React.JSX.Element {
 
         <div className="grid gap-4 xl:grid-cols-[320px_1fr_320px]">
           <div className="flex flex-col gap-4">
-            <LiamPanel connected={connected} hasPlayback={hasTrack} />
+            <LiamPanel connected={connected} hasPlayback={hasObservedTrack} />
             <UpNextPanel />
           </div>
 
@@ -191,20 +241,23 @@ export function App(): React.JSX.Element {
             onPlaybackChange={setPlayback}
           />
 
-          <Card>
-            <CardHeader>
-              <CardTitle>Manual Test Notes</CardTitle>
-              <CardDescription>
-                Use this panel to keep real Spotify testing grounded.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="flex flex-col gap-3 text-sm text-muted-foreground">
-              <p>1. Start playback in Spotify.</p>
-              <p>2. Click Now playing in the auth lab.</p>
-              <p>3. Confirm artwork, title, artist, state, and device.</p>
-              <p>4. Reopen the app and confirm the saved token still works.</p>
-            </CardContent>
-          </Card>
+          <div className="flex flex-col gap-4">
+            <EventTimeline events={playbackEvents} />
+            <Card>
+              <CardHeader>
+                <CardTitle>Manual Test Notes</CardTitle>
+                <CardDescription>
+                  Use this panel to keep real Spotify testing grounded.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="flex flex-col gap-3 text-sm text-muted-foreground">
+                <p>1. Start playback in Spotify.</p>
+                <p>2. Watch the local observer timeline.</p>
+                <p>3. Pause, resume, and skip tracks.</p>
+                <p>4. Compare local observations with Now playing.</p>
+              </CardContent>
+            </Card>
+          </div>
         </div>
       </main>
     </div>
