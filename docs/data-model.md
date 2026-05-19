@@ -1359,6 +1359,7 @@ previous playback state
 Potential inferred events:
 
 ```txt
+observer_attached
 track_started
 track_skipped
 track_completed
@@ -1372,6 +1373,10 @@ Inference should include confidence when appropriate.
 Initial desktop heuristics:
 
 ```txt
+observer_attached:
+  emitted for the first observed snapshot
+  because Trama did not witness the track start
+
 track_completed:
   inferred when a track changes after roughly 85% progress
   or with 15 seconds or less remaining

@@ -76,10 +76,9 @@ export function App(): React.JSX.Element {
         recentEvents: playbackEventsRef.current,
       });
       if (newEvents.length > 0) {
-        const updatedEvents = [...newEvents, ...playbackEventsRef.current].slice(
-          0,
-          12
-        );
+        const updatedEvents = [...newEvents, ...playbackEventsRef.current]
+          .sort((a, b) => b.observedAtMs - a.observedAtMs)
+          .slice(0, 12);
         playbackEventsRef.current = updatedEvents;
         setPlaybackEvents(updatedEvents);
       }

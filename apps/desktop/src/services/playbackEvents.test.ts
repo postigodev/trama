@@ -20,11 +20,11 @@ function observed(
 }
 
 describe('@trama/desktop - playback event inference', () => {
-  it('infers track_started for the first observed track', () => {
+  it('infers observer_attached for the first observed snapshot', () => {
     const events = inferPlaybackEvents(null, observed());
 
-    expect(events.map(event => event.type)).toEqual(['track_started']);
-    expect(events[0].summary).toBe('Started Track A by Artist A.');
+    expect(events.map(event => event.type)).toEqual(['observer_attached']);
+    expect(events[0].summary).toBe('Attached to Track A.');
   });
 
   it('does not create duplicate events for unchanged snapshots', () => {

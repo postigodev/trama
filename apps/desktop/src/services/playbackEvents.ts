@@ -1,6 +1,7 @@
 import type { ObservedPlayback } from '@/services/mediaSessionCommands';
 
 export type PlaybackEventType =
+  | 'observer_attached'
   | 'track_started'
   | 'track_completed'
   | 'track_skipped'
@@ -47,7 +48,14 @@ export function inferPlaybackEvents(
   }
 
   if (!previous) {
-    return [buildEvent('track_started', next, describeTrackStart(next), 0.9)];
+    return [
+      buildEvent(
+        'observer_attached',
+        next,
+        describeObserverAttached(next),
+        1
+      ),
+    ];
   }
 
   if (playbackIdentity(previous) !== playbackIdentity(next)) {
@@ -171,6 +179,11 @@ function describeTrackStart(playback: ObservedPlayback): string {
   return `Started ${title}${artist}.`;
 }
 
+function describeObserverAttached(playback: ObservedPlayback): string {
+  const title = playback.title ?? 'current track';
+  return `Attached to ${title}.`;
+}
+
 function describeReplay(playback: ObservedPlayback): string {
   return `Replayed ${playback.title ?? 'current track'}.`;
 }
@@ -200,7 +213,9 @@ function wasRecentlyStarted(
   return recentEvents
     .filter(
       event =>
-        event.type === 'track_started' || event.type === 'track_replayed'
+        event.type === 'observer_attached' ||
+        event.type === 'track_started' ||
+        event.type === 'track_replayed'
     )
     .slice(0, 8)
     .some(event => playbackEventIdentity(event) === identity);

@@ -423,6 +423,7 @@ enough to trust.
 Early event inference should prefer conservative, explainable heuristics:
 
 ```txt
+first snapshot -> observer attached event
 same track + play state change -> pause/resume event
 track change near the end -> completed event + next started event
 track change early -> skipped event + next started event
