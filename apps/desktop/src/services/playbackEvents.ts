@@ -149,13 +149,13 @@ function inferTransitionEvents(
     ];
   }
 
-  if (previous.positionMs >= 10000 && progressRatio <= 0.5) {
+  if (progressRatio < 0.85) {
     return [
       buildEvent(
         'track_skipped',
         { ...previous, observedAtMs: next.observedAtMs },
         describeTerminalEvent(previous, 'Skipped'),
-        progressRatio <= 0.25 ? 0.9 : 0.75
+        confidenceFromSkip(previous.positionMs, progressRatio)
       ),
     ];
   }
@@ -250,4 +250,12 @@ function formatDuration(milliseconds: number): string {
   const minutes = Math.floor(totalSeconds / 60);
   const seconds = totalSeconds % 60;
   return `${minutes}:${seconds.toString().padStart(2, '0')}`;
+}
+
+function confidenceFromSkip(positionMs: number, progressRatio: number): number {
+  if (positionMs < 5000) return 0.55;
+  if (positionMs < 10000) return 0.65;
+  if (progressRatio <= 0.25) return 0.9;
+  if (progressRatio <= 0.5) return 0.8;
+  return 0.7;
 }

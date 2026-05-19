@@ -420,6 +420,11 @@ The first desktop implementation keeps inferred events in memory and shows them
 in Lab Mode. Persistence should come after the inference behavior is useful
 enough to trust.
 
+The desktop app may use in-memory repositories as an intermediate session memory
+layer while the observer is being validated. This should still go through the
+same repository and core session derivation boundaries that SQLite will use
+later.
+
 Early event inference should prefer conservative, explainable heuristics:
 
 ```txt

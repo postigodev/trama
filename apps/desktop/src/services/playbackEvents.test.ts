@@ -53,8 +53,12 @@ describe('@trama/desktop - playback event inference', () => {
       observed({ title: 'Track B', observedAtMs: 1770000006000 })
     );
 
-    expect(events.map(event => event.type)).toEqual(['track_started']);
-    expect(events[0].summary).toBe('Started Track B by Artist A.');
+    expect(events.map(event => event.type)).toEqual([
+      'track_skipped',
+      'track_started',
+    ]);
+    expect(events[0].summary).toBe('Skipped Track A at 0:09 / 3:00.');
+    expect(events[1].summary).toBe('Started Track B by Artist A.');
   });
 
   it('infers completion when the track changes near the end', () => {
@@ -85,6 +89,34 @@ describe('@trama/desktop - playback event inference', () => {
     expect(events[0].confidence).toBe(0.9);
   });
 
+  it('infers low-confidence skip when the track changes very early', () => {
+    const events = inferPlaybackEvents(
+      observed({ positionMs: 2000, durationMs: 180000 }),
+      observed({ title: 'Track B', observedAtMs: 1770000011000 })
+    );
+
+    expect(events.map(event => event.type)).toEqual([
+      'track_skipped',
+      'track_started',
+    ]);
+    expect(events[0].summary).toBe('Skipped Track A at 0:02 / 3:00.');
+    expect(events[0].confidence).toBe(0.55);
+  });
+
+  it('infers skip when the track changes after the halfway point but before completion', () => {
+    const events = inferPlaybackEvents(
+      observed({ positionMs: 110000, durationMs: 180000 }),
+      observed({ title: 'Track B', observedAtMs: 1770000011500 })
+    );
+
+    expect(events.map(event => event.type)).toEqual([
+      'track_skipped',
+      'track_started',
+    ]);
+    expect(events[0].summary).toBe('Skipped Track A at 1:50 / 3:00.');
+    expect(events[0].confidence).toBe(0.7);
+  });
+
   it('infers replay when a recently started track comes back', () => {
     const recentEvents = inferPlaybackEvents(null, observed({ title: 'Track A' }));
     const events = inferPlaybackEvents(
@@ -93,8 +125,12 @@ describe('@trama/desktop - playback event inference', () => {
       { recentEvents }
     );
 
-    expect(events.map(event => event.type)).toEqual(['track_replayed']);
-    expect(events[0].summary).toBe('Replayed Track A.');
+    expect(events.map(event => event.type)).toEqual([
+      'track_skipped',
+      'track_replayed',
+    ]);
+    expect(events[0].summary).toBe('Skipped Track B at 0:09 / 3:00.');
+    expect(events[1].summary).toBe('Replayed Track A.');
   });
 
   it('shows Spotify as the friendly source label', () => {

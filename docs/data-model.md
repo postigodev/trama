@@ -1382,8 +1382,8 @@ track_completed:
   or with 15 seconds or less remaining
 
 track_skipped:
-  inferred when a track changes after at least 10 seconds
-  but before roughly 50% progress
+  inferred when a track changes before the completion zone
+  confidence is lower for very early changes
 
 track_replayed:
   inferred when a recently observed track appears again
@@ -1395,6 +1395,10 @@ sessions. They are session signals, not objective judgments about the music.
 Early desktop builds may keep inferred events in memory before writing them to
 the database. That is acceptable while the observer is being validated, as long
 as the event shape still matches the future persisted model.
+
+Observer-only events such as `observer_attached` explain Lab Mode state but do
+not need to be persisted as `PlayEvent` records unless they become useful for
+session derivation.
 
 ---
 

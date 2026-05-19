@@ -5,6 +5,8 @@
 
 import React, { useEffect, useRef, useState } from 'react';
 import { Activity, Headphones, Radio, RotateCcw } from 'lucide-react';
+import type { Session } from '@trama/core';
+import { createInMemoryRepositories } from '@trama/db';
 import type { PlaybackState } from '@trama/spotify-adapter';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -28,6 +30,12 @@ import {
   inferPlaybackEvents,
   type PlaybackEvent,
 } from '@/services/playbackEvents';
+import {
+  createLocalSessionRecorder,
+  type LocalSessionRecorder,
+} from '@/services/localSessionRecorder';
+
+const localSessionId = 'local-personal-session';
 
 export function App(): React.JSX.Element {
   const [connected, setConnected] = useState(false);
@@ -40,8 +48,16 @@ export function App(): React.JSX.Element {
   const [readingLocalSession, setReadingLocalSession] = useState(false);
   const [localObserverEnabled, setLocalObserverEnabled] = useState(true);
   const [playbackEvents, setPlaybackEvents] = useState<PlaybackEvent[]>([]);
+  const [localSession, setLocalSession] = useState<Session | null>(null);
   const observedPlaybackRef = useRef<ObservedPlayback | null>(null);
   const playbackEventsRef = useRef<PlaybackEvent[]>([]);
+  const sessionRecorderRef = useRef<LocalSessionRecorder | null>(null);
+  if (!sessionRecorderRef.current) {
+    sessionRecorderRef.current = createLocalSessionRecorder({
+      repositories: createInMemoryRepositories(),
+      sessionId: localSessionId,
+    });
+  }
   const hasTrack = Boolean(playback?.track);
   const hasObservedTrack = hasTrack || Boolean(observedPlayback?.title);
   const displayTitle =
@@ -76,11 +92,15 @@ export function App(): React.JSX.Element {
         recentEvents: playbackEventsRef.current,
       });
       if (newEvents.length > 0) {
+        const sessionRecorder = sessionRecorderRef.current;
+        if (!sessionRecorder) return;
+
         const updatedEvents = [...newEvents, ...playbackEventsRef.current]
           .sort((a, b) => b.observedAtMs - a.observedAtMs)
           .slice(0, 12);
         playbackEventsRef.current = updatedEvents;
         setPlaybackEvents(updatedEvents);
+        setLocalSession(await sessionRecorder.recordEvents(newEvents));
       }
     } catch (error) {
       setLocalObserverError(error instanceof Error ? error.message : String(error));
@@ -197,8 +217,25 @@ export function App(): React.JSX.Element {
                 <Badge variant="outline">
                   {observedPlayback?.source ?? 'No local source'}
                 </Badge>
+                <Badge variant="outline">
+                  {localSession
+                    ? `${localSession.recentTrackIds.length} recent`
+                    : 'No session yet'}
+                </Badge>
               </div>
               <div className="flex flex-col gap-2 text-xs text-muted-foreground">
+                {localSession?.currentTrackId ? (
+                  <span className="truncate">
+                    Current session track: {localSession.currentTrackId}
+                  </span>
+                ) : null}
+                {localSession ? (
+                  <span>
+                    Completed {localSession.completedTrackIds.length} · Skipped{' '}
+                    {localSession.skippedTrackIds.length} · Replayed{' '}
+                    {localSession.replayedTrackIds.length}
+                  </span>
+                ) : null}
                 {observedPlayback?.sourceAppId ? (
                   <span className="truncate">
                     Source app: {observedPlayback.sourceAppId}
