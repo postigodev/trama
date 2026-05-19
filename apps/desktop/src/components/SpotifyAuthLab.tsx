@@ -50,6 +50,8 @@ import {
   type TauriSpotifyAuthStatus,
   type TauriSpotifyTokenStatus,
 } from '@/services/tauriSpotifyAuthCommands';
+import { WaveformBars } from '@/components/WaveformBars';
+import { cn } from '@/lib/utils';
 
 interface AuthResultSummary {
   tokenType: string;
@@ -58,11 +60,21 @@ interface AuthResultSummary {
   hasRefreshToken: boolean;
 }
 
+interface SpotifyAuthLabProps {
+  className?: string;
+  onConnectionChange?: (connected: boolean) => void;
+  onPlaybackChange?: (playback: PlaybackState | null) => void;
+}
+
 const defaultRedirectUri =
   import.meta.env.VITE_SPOTIFY_REDIRECT_URI ??
   'http://127.0.0.1:5173/auth/spotify/callback';
 
-export function SpotifyAuthLab(): React.JSX.Element {
+export function SpotifyAuthLab({
+  className,
+  onConnectionChange,
+  onPlaybackChange,
+}: SpotifyAuthLabProps): React.JSX.Element {
   const [clientId, setClientId] = useState(
     import.meta.env.VITE_SPOTIFY_CLIENT_ID ?? ''
   );
@@ -102,7 +114,9 @@ export function SpotifyAuthLab(): React.JSX.Element {
     setError(null);
     try {
       setAuthStatus(await getSpotifyAuthStatusFromTauri());
-      setTokenStatus(await getSpotifyTokenStatusFromTauri());
+      const nextTokenStatus = await getSpotifyTokenStatusFromTauri();
+      setTokenStatus(nextTokenStatus);
+      onConnectionChange?.(nextTokenStatus.authenticated);
     } catch (unknownError) {
       setError(toErrorMessage(unknownError));
     } finally {
@@ -205,6 +219,7 @@ export function SpotifyAuthLab(): React.JSX.Element {
       );
 
       setPlayback(normalizedPlayback);
+      onPlaybackChange?.(normalizedPlayback);
       setMessage(
         normalizedPlayback.track
           ? 'Read current Spotify playback successfully.'
@@ -225,6 +240,8 @@ export function SpotifyAuthLab(): React.JSX.Element {
     try {
       setTokenStatus(await clearSpotifyTokenInTauri());
       setPlayback(null);
+      onConnectionChange?.(false);
+      onPlaybackChange?.(null);
       setResult(null);
       setMessage('Saved Spotify token was cleared from local app data.');
     } catch (unknownError) {
@@ -289,11 +306,11 @@ export function SpotifyAuthLab(): React.JSX.Element {
   }
 
   return (
-    <Card>
+    <Card className={cn('min-w-0', className)}>
       <CardHeader>
         <CardTitle>Spotify Auth Lab</CardTitle>
         <CardDescription>
-          A small PKCE smoke test for real personal mode. Tokens are exchanged in memory and are not displayed.
+          Connect, persist, refresh, and inspect current playback.
         </CardDescription>
         <CardAction>
           <Badge variant={configured ? 'secondary' : 'outline'}>
@@ -487,14 +504,15 @@ export function SpotifyAuthLab(): React.JSX.Element {
         ) : null}
 
         {playback ? (
-          <Card size="sm">
-            <CardHeader>
-              <CardTitle>Now Playing</CardTitle>
-              <CardDescription>
+          <section className="flex flex-col gap-3 rounded-lg border bg-muted/30 p-3">
+            <div>
+              <h2 className="text-sm font-medium">Now Playing</h2>
+              <p className="text-xs text-muted-foreground">
                 Observed at {formatDateTime(playback.observedAt)}
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="flex flex-col gap-3">
+              </p>
+            </div>
+            <WaveformBars active={playback.isPlaying} compact />
+            <div className="flex flex-col gap-3">
               {playback.track ? (
                 <div className="flex gap-3">
                   {playback.track.artworkUrl ? (
@@ -516,7 +534,7 @@ export function SpotifyAuthLab(): React.JSX.Element {
                       {playback.isPlaying ? 'Playing' : 'Paused'}
                       {typeof playback.progressMs === 'number' &&
                       playback.durationMs
-                        ? ` · ${formatDuration(playback.progressMs)} / ${formatDuration(
+                        ? ` / ${formatDuration(playback.progressMs)} of ${formatDuration(
                             playback.durationMs
                           )}`
                         : ''}
@@ -535,8 +553,8 @@ export function SpotifyAuthLab(): React.JSX.Element {
                   {playback.device.type ? ` (${playback.device.type})` : ''}
                 </p>
               ) : null}
-            </CardContent>
-          </Card>
+            </div>
+          </section>
         ) : null}
       </CardContent>
     </Card>

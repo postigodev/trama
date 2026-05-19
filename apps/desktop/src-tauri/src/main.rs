@@ -6,6 +6,8 @@ use std::fs;
 use std::path::PathBuf;
 use std::sync::Mutex;
 
+mod media_session;
+
 #[derive(Default)]
 struct SpotifyAuthState {
     pending: Mutex<Option<PendingSpotifyAuth>>,
@@ -251,6 +253,11 @@ fn spotify_token_clear(app: tauri::AppHandle) -> Result<SpotifyTokenStatus, Stri
     Ok(token_status_from_cached_token(&app, None))
 }
 
+#[tauri::command]
+async fn media_session_get_current() -> Result<Option<media_session::ObservedPlayback>, String> {
+    media_session::get_current_media_session().await
+}
+
 fn main() {
     tauri::Builder::default()
         .manage(SpotifyAuthState::default())
@@ -262,7 +269,8 @@ fn main() {
             spotify_token_save,
             spotify_token_load,
             spotify_token_status,
-            spotify_token_clear
+            spotify_token_clear,
+            media_session_get_current
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

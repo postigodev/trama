@@ -370,14 +370,60 @@ If logic belongs to persistence, put it in `db`.
 
 ---
 
+## Observation and Control Split
+
+Trama should separate observation from provider control.
+
+Preferred real-provider architecture:
+
+```txt
+local OS media session observer
+        ↓
+normalized ObservedPlayback
+        ↓
+local event inference and event log
+        ↓
+core session/ranking engine
+        ↓
+Liam control action
+        ↓
+Spotify Web API control/enrichment
+```
+
+Observation should be local-first when the OS exposes a reliable media session
+API. On Windows, this means using system media session APIs before falling back
+to Spotify polling. Spotify Web API should remain responsible for
+provider-specific control and enrichment:
+
+```txt
+OS media session:
+  observe active media source
+  detect title/artist/playback state/timeline
+  avoid provider rate limits for basic observation
+
+Spotify Web API:
+  authenticate
+  refresh tokens
+  queue tracks
+  pause/resume/skip when controlling Spotify
+  read playlists/recently played/queue
+  enrich local observations with Spotify IDs and metadata
+```
+
+The Web Playback SDK is not the default path because it turns Trama into a
+Spotify Connect playback device and does not expose Spotify Mix transition
+controls.
+
+---
+
 ## Main data flow
 
 The normal Trama loop should look like this:
 
 ```txt
-provider playback state or demo event
+OS media observation, provider playback state, or demo event
         ↓
-normalized Track/Event model
+normalized ObservedPlayback / Track / Event model
         ↓
 local event log
         ↓

@@ -10,14 +10,16 @@ It is not the core of Trama.
 Trama core engine != Spotify adapter
 ````
 
-Spotify can provide playback state, library/playlist context, and queue actions.
-Trama should provide local session tracking, ranking logic, explanations, and user control.
+Spotify can provide library/playlist context, metadata enrichment, and queue or
+playback control actions. Trama should prefer local OS media session APIs for
+basic observation when they are available.
 
 ---
 
 ## Purpose of the Spotify adapter
 
-The Spotify adapter should let a user connect their Spotify account and use Trama as a local companion layer for their current listening session.
+The Spotify adapter should let a user connect their Spotify account and use
+Trama as a local companion/controller layer for their current listening session.
 
 The adapter may support:
 
@@ -29,6 +31,7 @@ user playlist import
 saved/library track import when available
 search-based candidate discovery
 queue insertion
+pause/resume/skip control
 device awareness
 provider error handling
 ```
@@ -317,7 +320,20 @@ queue_action_failed
 
 ## Playback observation
 
-Playback observation should be conservative.
+Playback observation should be local-first when possible.
+
+Preferred order:
+
+```txt
+1. OS media session observer
+2. Spotify Web API current playback as fallback or enrichment
+3. Demo playback simulator
+```
+
+This reduces Spotify API traffic and lets Trama observe the actual local media
+session, including Spotify Desktop playback and potentially future providers.
+
+Spotify polling should be conservative when used.
 
 Possible polling loop:
 

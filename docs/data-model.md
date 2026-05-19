@@ -1266,6 +1266,49 @@ Do not leak provider response shapes into `packages/core`.
 
 ---
 
+# ObservedPlayback
+
+`ObservedPlayback` is the provider-independent shape for local OS media session
+observation.
+
+It is intentionally looser than `PlaybackState` because OS media sessions may
+not include provider IDs, canonical track IDs, or full album metadata.
+
+```ts
+type ObservedPlayback = {
+  source: "windows_media_session" | "macos_now_playing" | "linux_mpris";
+  sourceAppId?: string;
+
+  title?: string;
+  artist?: string;
+  albumTitle?: string;
+
+  playbackStatus?: "playing" | "paused" | "stopped" | "closed" | "unknown";
+
+  positionMs?: number;
+  durationMs?: number;
+
+  observedAtMs: number;
+};
+```
+
+`ObservedPlayback` should be used for local-first observation and then enriched
+by provider adapters when possible.
+
+Example:
+
+```txt
+Windows media session
+  -> ObservedPlayback
+  -> optional Spotify enrichment
+  -> Track / PlaybackState / PlayEvent
+```
+
+The absence of provider IDs should not block event inference. It should lower
+confidence or trigger enrichment.
+
+---
+
 # PlaybackState
 
 Provider adapters may expose normalized playback state.
