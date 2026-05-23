@@ -1396,6 +1396,12 @@ Early desktop builds may keep inferred events in memory before writing them to
 the database. That is acceptable while the observer is being validated, as long
 as the event shape still matches the future persisted model.
 
+The current desktop app persists `tracks`, `sessions`, `play_events`, and
+`feedback_events` locally through a Tauri-backed SQLite layer. Nested fields
+such as `artists`, `providerIds`, `controls`, and `feedbackByTrack` may be
+stored in JSON payload columns for now, while still remaining Trama-owned
+normalized models at the repository boundary.
+
 Observer-only events such as `observer_attached` explain Lab Mode state but do
 not need to be persisted as `PlayEvent` records unless they become useful for
 session derivation.

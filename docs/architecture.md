@@ -416,14 +416,25 @@ The Web Playback SDK is not the default path because it turns Trama into a
 Spotify Connect playback device and does not expose Spotify Mix transition
 controls.
 
-The first desktop implementation keeps inferred events in memory and shows them
-in Lab Mode. Persistence should come after the inference behavior is useful
-enough to trust.
+The first desktop implementation validated inferred events in memory and in Lab
+Mode. Once the heuristics were useful enough to trust, the desktop app moved to
+local SQLite persistence behind the same repository boundaries.
 
-The desktop app may use in-memory repositories as an intermediate session memory
-layer while the observer is being validated. This should still go through the
-same repository and core session derivation boundaries that SQLite will use
-later.
+The current desktop shape is:
+
+```txt
+React UI
+  -> desktop service
+  -> repository interface
+  -> Tauri command bridge
+  -> local SQLite
+  -> repository result
+  -> core session derivation
+```
+
+This keeps `packages/core` provider-independent and database-independent while
+still giving the desktop app a durable event log and session memory across
+restarts.
 
 Early event inference should prefer conservative, explainable heuristics:
 

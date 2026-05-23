@@ -7,6 +7,7 @@ use std::path::PathBuf;
 use std::sync::Mutex;
 
 mod media_session;
+mod persistence;
 
 #[derive(Default)]
 struct SpotifyAuthState {
@@ -270,7 +271,19 @@ fn main() {
             spotify_token_load,
             spotify_token_status,
             spotify_token_clear,
-            media_session_get_current
+            media_session_get_current,
+            persistence::local_db_status,
+            persistence::db_session_create,
+            persistence::db_session_find_by_id,
+            persistence::db_session_get_active,
+            persistence::db_session_update,
+            persistence::db_track_upsert,
+            persistence::db_track_find_by_id,
+            persistence::db_track_find_many_by_ids,
+            persistence::db_event_append_play_event,
+            persistence::db_event_append_feedback_event,
+            persistence::db_event_list_play_events_for_session,
+            persistence::db_event_list_feedback_events_for_session
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
@@ -330,7 +343,7 @@ fn token_cache_path(app: &tauri::AppHandle) -> String {
 }
 
 fn token_cache_path_buf(app: &tauri::AppHandle) -> Result<PathBuf, String> {
-    spotify_storage_dir(app).map(|path| path.join("spotify-token.json"))
+    trama_storage_dir(app).map(|path| path.join("spotify-token.json"))
 }
 
 fn ensure_token_cache_dir(app: &tauri::AppHandle) -> Result<(), String> {
@@ -389,7 +402,7 @@ fn read_legacy_token_cache(app: &tauri::AppHandle) -> Result<Option<SpotifyCache
     Ok(Some(token))
 }
 
-fn spotify_storage_dir(app: &tauri::AppHandle) -> Result<PathBuf, String> {
+pub(crate) fn trama_storage_dir(app: &tauri::AppHandle) -> Result<PathBuf, String> {
     if let Some(path) = stable_user_data_dir() {
         return Ok(path.join("Trama"));
     }

@@ -6,7 +6,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Activity, Headphones, Radio, RotateCcw } from 'lucide-react';
 import type { Session } from '@trama/core';
-import { createInMemoryRepositories } from '@trama/db';
 import type { PlaybackState } from '@trama/spotify-adapter';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -34,6 +33,10 @@ import {
   createLocalSessionRecorder,
   type LocalSessionRecorder,
 } from '@/services/localSessionRecorder';
+import {
+  createDesktopRepositories,
+  getLocalDbStatus,
+} from '@/services/tauriRepositories';
 
 const localSessionId = 'local-personal-session';
 
@@ -49,12 +52,13 @@ export function App(): React.JSX.Element {
   const [localObserverEnabled, setLocalObserverEnabled] = useState(true);
   const [playbackEvents, setPlaybackEvents] = useState<PlaybackEvent[]>([]);
   const [localSession, setLocalSession] = useState<Session | null>(null);
+  const [localDbPath, setLocalDbPath] = useState<string | null>(null);
   const observedPlaybackRef = useRef<ObservedPlayback | null>(null);
   const playbackEventsRef = useRef<PlaybackEvent[]>([]);
   const sessionRecorderRef = useRef<LocalSessionRecorder | null>(null);
   if (!sessionRecorderRef.current) {
     sessionRecorderRef.current = createLocalSessionRecorder({
-      repositories: createInMemoryRepositories(),
+      repositories: createDesktopRepositories(),
       sessionId: localSessionId,
     });
   }
@@ -108,6 +112,44 @@ export function App(): React.JSX.Element {
       setReadingLocalSession(false);
     }
   }
+
+  useEffect(() => {
+    let cancelled = false;
+    const sessionRecorder = sessionRecorderRef.current;
+
+    if (!sessionRecorder) {
+      return undefined;
+    }
+
+    void (async () => {
+      try {
+        const [persistedState, dbStatus] = await Promise.all([
+          sessionRecorder.hydratePersistedState(),
+          getLocalDbStatus(),
+        ]);
+        if (cancelled) {
+          return;
+        }
+
+        playbackEventsRef.current = persistedState.playbackEvents;
+        setPlaybackEvents(persistedState.playbackEvents);
+        setLocalSession(persistedState.session);
+        setLocalDbPath(dbStatus?.dbPath ?? null);
+      } catch (error) {
+        if (cancelled) {
+          return;
+        }
+
+        setLocalObserverError(
+          error instanceof Error ? error.message : String(error)
+        );
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   useEffect(() => {
     if (!localObserverEnabled) {
@@ -222,6 +264,9 @@ export function App(): React.JSX.Element {
                     ? `${localSession.recentTrackIds.length} recent`
                     : 'No session yet'}
                 </Badge>
+                <Badge variant={localDbPath ? 'secondary' : 'outline'}>
+                  {localDbPath ? 'Persistent session on' : 'Session persistence off'}
+                </Badge>
               </div>
               <div className="flex flex-col gap-2 text-xs text-muted-foreground">
                 {localSession?.currentTrackId ? (
@@ -240,6 +285,9 @@ export function App(): React.JSX.Element {
                   <span className="truncate">
                     Source app: {observedPlayback.sourceAppId}
                   </span>
+                ) : null}
+                {localDbPath ? (
+                  <span className="truncate">Local DB: {localDbPath}</span>
                 ) : null}
                 {localObserverError ? (
                   <span>{localObserverError}</span>

@@ -81,4 +81,31 @@ describe('@trama/desktop - local session recorder', () => {
     expect(session.replayedTrackIds).toEqual(session.completedTrackIds);
     expect(session.acceptedArtistIds).toHaveLength(1);
   });
+
+  it('hydrates persisted timeline events from repository state', async () => {
+    const repositories = createInMemoryRepositories();
+    const recorder = createLocalSessionRecorder({
+      repositories,
+      sessionId: 'session-1',
+    });
+
+    await recorder.recordEvents([
+      playbackEvent({ type: 'track_started' }),
+      playbackEvent({
+        id: 'event-2',
+        type: 'track_skipped',
+        progressMs: 22000,
+        observedAtMs: 1770000005000,
+      }),
+    ]);
+
+    const hydrated = await recorder.hydratePersistedState();
+
+    expect(hydrated.session?.skippedTrackIds).toHaveLength(1);
+    expect(hydrated.playbackEvents.map(event => event.type)).toEqual([
+      'track_skipped',
+      'track_started',
+    ]);
+    expect(hydrated.playbackEvents[0]?.sourceLabel).toBe('Spotify');
+  });
 });
