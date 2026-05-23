@@ -8,6 +8,10 @@ export interface SpotifyClient {
   getCurrentPlayback: () => Promise<SpotifyCurrentlyPlayingResponse | null>;
   getRecentlyPlayed: () => Promise<SpotifyTrackObject[]>;
   addToQueue: (spotifyTrackUri: string) => Promise<void>;
+  pausePlayback: () => Promise<void>;
+  resumePlayback: () => Promise<void>;
+  skipToNext: () => Promise<void>;
+  skipToPrevious: () => Promise<void>;
 }
 
 export function createSpotifyClient(_accessToken: string): SpotifyClient {
@@ -22,7 +26,32 @@ export function createSpotifyClient(_accessToken: string): SpotifyClient {
         'https://api.spotify.com/v1/me/player'
       ),
     getRecentlyPlayed: async () => [],
-    addToQueue: async (_spotifyTrackUri: string) => {},
+    addToQueue: async (spotifyTrackUri: string) => {
+      const uri = spotifyTrackUri.trim();
+      if (!uri.startsWith('spotify:track:')) {
+        throw new Error('A Spotify track URI is required');
+      }
+
+      await requestNoContent(
+        `https://api.spotify.com/v1/me/player/queue?uri=${encodeURIComponent(uri)}`,
+        'POST'
+      );
+    },
+    pausePlayback: async () => {
+      await requestNoContent('https://api.spotify.com/v1/me/player/pause', 'PUT');
+    },
+    resumePlayback: async () => {
+      await requestNoContent('https://api.spotify.com/v1/me/player/play', 'PUT');
+    },
+    skipToNext: async () => {
+      await requestNoContent('https://api.spotify.com/v1/me/player/next', 'POST');
+    },
+    skipToPrevious: async () => {
+      await requestNoContent(
+        'https://api.spotify.com/v1/me/player/previous',
+        'POST'
+      );
+    },
   };
 
   async function getJsonOrNull<T>(url: string): Promise<T | null> {
@@ -45,5 +74,33 @@ export function createSpotifyClient(_accessToken: string): SpotifyClient {
     }
 
     return (await response.json()) as T;
+  }
+
+  async function requestNoContent(
+    url: string,
+    method: 'POST' | 'PUT'
+  ): Promise<void> {
+    const response = await fetch(url, {
+      method,
+      headers: {
+        authorization: `Bearer ${accessToken}`,
+      },
+    });
+
+    if (response.status === 401) {
+      throw new Error('Spotify access token expired or was rejected');
+    }
+
+    if (response.status === 403) {
+      throw new Error('Spotify rejected playback control. Premium may be required.');
+    }
+
+    if (response.status === 404) {
+      throw new Error('Spotify has no active playback device.');
+    }
+
+    if (!response.ok) {
+      throw new Error(`Spotify request failed with status ${response.status}`);
+    }
   }
 }

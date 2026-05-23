@@ -46,4 +46,50 @@ describe('@trama/spotify-adapter - client', () => {
   it('rejects empty access tokens', () => {
     expect(() => createSpotifyClient('')).toThrow('Spotify access token is required');
   });
+
+  it('adds a track URI to the Spotify queue', async () => {
+    const fetchMock = vi.fn<typeof fetch>(async () => {
+      return new Response(null, { status: 204 });
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    await createSpotifyClient('access-token').addToQueue('spotify:track:abc123');
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      'https://api.spotify.com/v1/me/player/queue?uri=spotify%3Atrack%3Aabc123',
+      {
+        method: 'POST',
+        headers: {
+          authorization: 'Bearer access-token',
+        },
+      }
+    );
+
+    vi.unstubAllGlobals();
+  });
+
+  it('rejects non-track queue URIs before calling Spotify', async () => {
+    const fetchMock = vi.fn<typeof fetch>();
+    vi.stubGlobal('fetch', fetchMock);
+
+    await expect(
+      createSpotifyClient('access-token').addToQueue('spotify:album:abc123')
+    ).rejects.toThrow('A Spotify track URI is required');
+    expect(fetchMock).not.toHaveBeenCalled();
+
+    vi.unstubAllGlobals();
+  });
+
+  it('surfaces playback control recovery errors', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn<typeof fetch>(async () => new Response(null, { status: 404 }))
+    );
+
+    await expect(
+      createSpotifyClient('access-token').skipToNext()
+    ).rejects.toThrow('Spotify has no active playback device.');
+
+    vi.unstubAllGlobals();
+  });
 });

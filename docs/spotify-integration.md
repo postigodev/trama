@@ -619,6 +619,21 @@ Do not request write scopes unless the feature needs them.
 
 Do not request playlist modification scopes in v0 unless Trama actually creates or edits playlists.
 
+Initial Liam control uses Spotify Web API playback control:
+
+```txt
+queue explicit track URI
+pause playback
+resume playback
+skip next
+skip previous
+```
+
+These actions control what Spotify plays, but they do not control Spotify Mix
+transition curves, EQ, fade length, waveform anchors, or internal audio DSP.
+Queue/control failures should surface provider recovery steps such as missing
+Premium, no active device, or expired auth.
+
 ---
 
 ## Local configuration

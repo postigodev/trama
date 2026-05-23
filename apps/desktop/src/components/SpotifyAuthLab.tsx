@@ -87,12 +87,24 @@ export function SpotifyAuthLab({
     null
   );
   const [playback, setPlayback] = useState<PlaybackState | null>(null);
+  const [queueUri, setQueueUri] = useState('');
   const [authorizeUrl, setAuthorizeUrl] = useState<string | null>(null);
   const [result, setResult] = useState<AuthResultSummary | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busyAction, setBusyAction] = useState<
-    'status' | 'start' | 'finish' | 'cancel' | 'playback' | 'clearToken' | null
+    | 'status'
+    | 'start'
+    | 'finish'
+    | 'cancel'
+    | 'playback'
+    | 'clearToken'
+    | 'queue'
+    | 'pause'
+    | 'resume'
+    | 'next'
+    | 'previous'
+    | null
   >(null);
 
   const config = useMemo<SpotifyAuthConfig>(
@@ -244,6 +256,47 @@ export function SpotifyAuthLab({
       onPlaybackChange?.(null);
       setResult(null);
       setMessage('Saved Spotify token was cleared from local app data.');
+    } catch (unknownError) {
+      setError(toErrorMessage(unknownError));
+    } finally {
+      setBusyAction(null);
+    }
+  }
+
+  async function queueTrack(): Promise<void> {
+    setBusyAction('queue');
+    setError(null);
+    setMessage(null);
+
+    try {
+      const token = await loadUsableToken();
+      await createSpotifyClient(token.accessToken).addToQueue(queueUri);
+      setMessage(`Liam queued ${queueUri.trim()}.`);
+      setQueueUri('');
+    } catch (unknownError) {
+      setError(toErrorMessage(unknownError));
+    } finally {
+      setBusyAction(null);
+    }
+  }
+
+  async function runPlaybackControl(
+    action: 'pause' | 'resume' | 'next' | 'previous'
+  ): Promise<void> {
+    setBusyAction(action);
+    setError(null);
+    setMessage(null);
+
+    try {
+      const token = await loadUsableToken();
+      const client = createSpotifyClient(token.accessToken);
+
+      if (action === 'pause') await client.pausePlayback();
+      if (action === 'resume') await client.resumePlayback();
+      if (action === 'next') await client.skipToNext();
+      if (action === 'previous') await client.skipToPrevious();
+
+      setMessage(`Spotify ${formatPlaybackAction(action)} command sent.`);
     } catch (unknownError) {
       setError(toErrorMessage(unknownError));
     } finally {
@@ -456,6 +509,79 @@ export function SpotifyAuthLab({
           />
         </div>
 
+        <section className="flex flex-col gap-3 rounded-lg border bg-muted/20 p-3">
+          <div>
+            <h2 className="text-sm font-medium">Liam Control Lab</h2>
+            <p className="text-xs text-muted-foreground">
+              Direct Spotify controls for testing queue and playback actions.
+            </p>
+          </div>
+
+          <div className="grid gap-2 md:grid-cols-[1fr_auto]">
+            <div className="flex flex-col gap-2">
+              <Label htmlFor="spotify-queue-uri">Spotify track URI</Label>
+              <Input
+                id="spotify-queue-uri"
+                value={queueUri}
+                onChange={event => setQueueUri(event.target.value)}
+                placeholder="spotify:track:..."
+                autoComplete="off"
+              />
+            </div>
+            <Button
+              className="self-end"
+              onClick={queueTrack}
+              disabled={
+                busyAction !== null ||
+                !tokenStatus?.authenticated ||
+                queueUri.trim().length === 0
+              }
+            >
+              {busyAction === 'queue' ? (
+                <Loader2 data-icon="inline-start" className="animate-spin" />
+              ) : (
+                <Music2 data-icon="inline-start" />
+              )}
+              Queue
+            </Button>
+          </div>
+
+          <div className="flex flex-wrap gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => void runPlaybackControl('previous')}
+              disabled={busyAction !== null || !tokenStatus?.authenticated}
+            >
+              Previous
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => void runPlaybackControl('pause')}
+              disabled={busyAction !== null || !tokenStatus?.authenticated}
+            >
+              Pause
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => void runPlaybackControl('resume')}
+              disabled={busyAction !== null || !tokenStatus?.authenticated}
+            >
+              Resume
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => void runPlaybackControl('next')}
+              disabled={busyAction !== null || !tokenStatus?.authenticated}
+            >
+              Next
+            </Button>
+          </div>
+        </section>
+
         <div>
           <Button
             onClick={finishAuth}
@@ -601,4 +727,12 @@ function formatDuration(milliseconds: number): string {
   const minutes = Math.floor(totalSeconds / 60);
   const seconds = totalSeconds % 60;
   return `${minutes}:${seconds.toString().padStart(2, '0')}`;
+}
+
+function formatPlaybackAction(
+  action: 'pause' | 'resume' | 'next' | 'previous'
+): string {
+  if (action === 'next') return 'skip next';
+  if (action === 'previous') return 'skip previous';
+  return action;
 }
