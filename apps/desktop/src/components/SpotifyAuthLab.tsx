@@ -50,6 +50,10 @@ import {
   type TauriSpotifyAuthStatus,
   type TauriSpotifyTokenStatus,
 } from '@/services/tauriSpotifyAuthCommands';
+import {
+  loadSpotifyLabSettings,
+  saveSpotifyLabSettings,
+} from '@/services/spotifyLabSettings';
 import { WaveformBars } from '@/components/WaveformBars';
 import { cn } from '@/lib/utils';
 
@@ -75,10 +79,13 @@ export function SpotifyAuthLab({
   onConnectionChange,
   onPlaybackChange,
 }: SpotifyAuthLabProps): React.JSX.Element {
+  const storedSettings = loadSpotifyLabSettings();
   const [clientId, setClientId] = useState(
-    import.meta.env.VITE_SPOTIFY_CLIENT_ID ?? ''
+    storedSettings.clientId ?? import.meta.env.VITE_SPOTIFY_CLIENT_ID ?? ''
   );
-  const [redirectUri, setRedirectUri] = useState(defaultRedirectUri);
+  const [redirectUri, setRedirectUri] = useState(
+    storedSettings.redirectUri ?? defaultRedirectUri
+  );
   const [callbackValue, setCallbackValue] = useState('');
   const [authStatus, setAuthStatus] = useState<TauriSpotifyAuthStatus | null>(
     null
@@ -120,6 +127,10 @@ export function SpotifyAuthLab({
   useEffect(() => {
     void refreshStatus();
   }, []);
+
+  useEffect(() => {
+    saveSpotifyLabSettings({ clientId, redirectUri });
+  }, [clientId, redirectUri]);
 
   async function refreshStatus(): Promise<void> {
     setBusyAction('status');
@@ -519,12 +530,12 @@ export function SpotifyAuthLab({
 
           <div className="grid gap-2 md:grid-cols-[1fr_auto]">
             <div className="flex flex-col gap-2">
-              <Label htmlFor="spotify-queue-uri">Spotify track URI</Label>
+              <Label htmlFor="spotify-queue-uri">Spotify track URI or link</Label>
               <Input
                 id="spotify-queue-uri"
                 value={queueUri}
                 onChange={event => setQueueUri(event.target.value)}
-                placeholder="spotify:track:..."
+                placeholder="spotify:track:... or https://open.spotify.com/track/..."
                 autoComplete="off"
               />
             </div>

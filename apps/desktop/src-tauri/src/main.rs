@@ -330,10 +330,7 @@ fn token_cache_path(app: &tauri::AppHandle) -> String {
 }
 
 fn token_cache_path_buf(app: &tauri::AppHandle) -> Result<PathBuf, String> {
-    app.path_resolver()
-        .app_data_dir()
-        .map(|path| path.join("spotify-token.json"))
-        .ok_or_else(|| "failed to resolve app data directory".to_string())
+    spotify_storage_dir(app).map(|path| path.join("spotify-token.json"))
 }
 
 fn ensure_token_cache_dir(app: &tauri::AppHandle) -> Result<(), String> {
@@ -359,7 +356,7 @@ fn write_token_cache(app: &tauri::AppHandle, token: &SpotifyCachedToken) -> Resu
 fn read_token_cache(app: &tauri::AppHandle) -> Result<Option<SpotifyCachedToken>, String> {
     let path = token_cache_path_buf(app)?;
     if !path.exists() {
-        return Ok(None);
+        return read_legacy_token_cache(app);
     }
 
     let raw = fs::read_to_string(path)
@@ -368,6 +365,51 @@ fn read_token_cache(app: &tauri::AppHandle) -> Result<Option<SpotifyCachedToken>
         .map_err(|error| format!("failed to parse Spotify token cache: {error}"))?;
 
     Ok(Some(token))
+}
+
+fn read_legacy_token_cache(app: &tauri::AppHandle) -> Result<Option<SpotifyCachedToken>, String> {
+    let Some(path) = app
+        .path_resolver()
+        .app_data_dir()
+        .map(|path| path.join("spotify-token.json"))
+    else {
+        return Ok(None);
+    };
+
+    if !path.exists() {
+        return Ok(None);
+    }
+
+    let raw = fs::read_to_string(&path)
+        .map_err(|error| format!("failed to read legacy Spotify token cache: {error}"))?;
+    let token: SpotifyCachedToken = serde_json::from_str(&raw)
+        .map_err(|error| format!("failed to parse legacy Spotify token cache: {error}"))?;
+
+    write_token_cache(app, &token)?;
+    Ok(Some(token))
+}
+
+fn spotify_storage_dir(app: &tauri::AppHandle) -> Result<PathBuf, String> {
+    if let Some(path) = stable_user_data_dir() {
+        return Ok(path.join("Trama"));
+    }
+
+    app.path_resolver()
+        .app_local_data_dir()
+        .or_else(|| app.path_resolver().app_data_dir())
+        .ok_or_else(|| "failed to resolve Trama storage directory".to_string())
+}
+
+fn stable_user_data_dir() -> Option<PathBuf> {
+    #[cfg(target_os = "windows")]
+    {
+        std::env::var_os("APPDATA").map(PathBuf::from)
+    }
+
+    #[cfg(not(target_os = "windows"))]
+    {
+        std::env::var_os("HOME").map(|home| PathBuf::from(home).join(".trama"))
+    }
 }
 
 fn token_status_from_cached_token(

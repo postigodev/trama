@@ -7,7 +7,7 @@ import type { SpotifyCurrentlyPlayingResponse, SpotifyTrackObject } from './type
 export interface SpotifyClient {
   getCurrentPlayback: () => Promise<SpotifyCurrentlyPlayingResponse | null>;
   getRecentlyPlayed: () => Promise<SpotifyTrackObject[]>;
-  addToQueue: (spotifyTrackUri: string) => Promise<void>;
+  addToQueue: (spotifyTrackUriOrUrl: string) => Promise<void>;
   pausePlayback: () => Promise<void>;
   resumePlayback: () => Promise<void>;
   skipToNext: () => Promise<void>;
@@ -26,11 +26,8 @@ export function createSpotifyClient(_accessToken: string): SpotifyClient {
         'https://api.spotify.com/v1/me/player'
       ),
     getRecentlyPlayed: async () => [],
-    addToQueue: async (spotifyTrackUri: string) => {
-      const uri = spotifyTrackUri.trim();
-      if (!uri.startsWith('spotify:track:')) {
-        throw new Error('A Spotify track URI is required');
-      }
+    addToQueue: async (spotifyTrackUriOrUrl: string) => {
+      const uri = normalizeSpotifyTrackReference(spotifyTrackUriOrUrl);
 
       await requestNoContent(
         `https://api.spotify.com/v1/me/player/queue?uri=${encodeURIComponent(uri)}`,
@@ -103,4 +100,43 @@ export function createSpotifyClient(_accessToken: string): SpotifyClient {
       throw new Error(`Spotify request failed with status ${response.status}`);
     }
   }
+}
+
+export function normalizeSpotifyTrackReference(input: string): string {
+  const trimmed = input.trim();
+
+  if (trimmed.startsWith('spotify:track:')) {
+    return trimmed;
+  }
+
+  if (!trimmed.includes('://')) {
+    throw new Error(
+      'A Spotify track URI or open.spotify.com track link is required'
+    );
+  }
+
+  let parsed: URL;
+  try {
+    parsed = new URL(trimmed);
+  } catch {
+    throw new Error(
+      'A Spotify track URI or open.spotify.com track link is required'
+    );
+  }
+
+  const host = parsed.hostname.toLowerCase();
+  const pathParts = parsed.pathname.split('/').filter(Boolean);
+  const trackIndex = pathParts.findIndex(part => part === 'track');
+  const trackId = trackIndex >= 0 ? pathParts[trackIndex + 1] : undefined;
+
+  if (
+    (host === 'open.spotify.com' || host.endsWith('.spotify.com')) &&
+    trackId
+  ) {
+    return `spotify:track:${trackId}`;
+  }
+
+  throw new Error(
+    'A Spotify track URI or open.spotify.com track link is required'
+  );
 }

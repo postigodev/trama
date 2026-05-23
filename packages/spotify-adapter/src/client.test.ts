@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { createSpotifyClient } from './client';
+import { createSpotifyClient, normalizeSpotifyTrackReference } from './client';
 
 describe('@trama/spotify-adapter - client', () => {
   it('fetches current playback with bearer auth', async () => {
@@ -68,16 +68,49 @@ describe('@trama/spotify-adapter - client', () => {
     vi.unstubAllGlobals();
   });
 
+  it('accepts open.spotify.com track links for queueing', async () => {
+    const fetchMock = vi.fn<typeof fetch>(async () => {
+      return new Response(null, { status: 204 });
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    await createSpotifyClient('access-token').addToQueue(
+      'https://open.spotify.com/intl-es/track/02kGOhqsrxDTAbFFSdNabc?si=xyz'
+    );
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      'https://api.spotify.com/v1/me/player/queue?uri=spotify%3Atrack%3A02kGOhqsrxDTAbFFSdNabc',
+      {
+        method: 'POST',
+        headers: {
+          authorization: 'Bearer access-token',
+        },
+      }
+    );
+
+    vi.unstubAllGlobals();
+  });
+
   it('rejects non-track queue URIs before calling Spotify', async () => {
     const fetchMock = vi.fn<typeof fetch>();
     vi.stubGlobal('fetch', fetchMock);
 
     await expect(
       createSpotifyClient('access-token').addToQueue('spotify:album:abc123')
-    ).rejects.toThrow('A Spotify track URI is required');
+    ).rejects.toThrow(
+      'A Spotify track URI or open.spotify.com track link is required'
+    );
     expect(fetchMock).not.toHaveBeenCalled();
 
     vi.unstubAllGlobals();
+  });
+
+  it('normalizes open.spotify track links into track URIs', () => {
+    expect(
+      normalizeSpotifyTrackReference(
+        'https://open.spotify.com/track/02kGOhqsrxDTAbFFSdNabc'
+      )
+    ).toBe('spotify:track:02kGOhqsrxDTAbFFSdNabc');
   });
 
   it('surfaces playback control recovery errors', async () => {
