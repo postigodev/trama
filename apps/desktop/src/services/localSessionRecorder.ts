@@ -2,8 +2,10 @@ import {
   createSession,
   deriveSessionFromEvents,
   type FeedbackEvent,
+  type FeedbackType,
   type PlayEvent,
   type PlayEventType,
+  type RankedCandidate,
   type Session,
   type Track,
 } from '@trama/core';
@@ -13,6 +15,33 @@ import type { PlaybackEvent } from '@/services/playbackEvents';
 export interface LocalSessionRecorderOptions {
   repositories: TramaRepositories;
   sessionId: string;
+}
+
+export interface RecordFeedbackInput {
+  trackId: string;
+  type: FeedbackType;
+  occurredAtMs?: number;
+  note?: string;
+}
+
+export interface RecordFeedbackResult {
+  session: Session;
+  feedbackEvent: FeedbackEvent;
+}
+
+export interface RecordAutopilotChangeResult {
+  session: Session;
+  playEvent: PlayEvent;
+}
+
+export interface RecordCandidateQueuedInput {
+  candidate: RankedCandidate;
+  occurredAtMs?: number;
+}
+
+export interface RecordCandidateQueuedResult {
+  session: Session;
+  playEvent: PlayEvent;
 }
 
 const persistedEventTypes = new Set<PlaybackEvent['type']>([
@@ -68,6 +97,67 @@ export class LocalSessionRecorder {
     }
 
     return this.deriveAndPersistSession(baseSession);
+  }
+
+  async recordFeedback(
+    input: RecordFeedbackInput
+  ): Promise<RecordFeedbackResult> {
+    const occurredAtMs = input.occurredAtMs ?? Date.now();
+    const baseSession = await this.ensureSession(occurredAtMs);
+    const feedbackEvent = buildFeedbackEvent(
+      this.options.sessionId,
+      input,
+      occurredAtMs
+    );
+
+    await this.options.repositories.events.appendFeedbackEvent(feedbackEvent);
+    const session = await this.deriveAndPersistSession(baseSession);
+
+    return {
+      session,
+      feedbackEvent,
+    };
+  }
+
+  async recordAutopilotChange(
+    enabled: boolean,
+    occurredAtMs = Date.now()
+  ): Promise<RecordAutopilotChangeResult> {
+    const baseSession = await this.ensureSession(occurredAtMs);
+    const playEvent = buildAutopilotEvent(
+      this.options.sessionId,
+      enabled,
+      occurredAtMs
+    );
+
+    await this.options.repositories.events.appendPlayEvent(playEvent);
+    const session = await this.deriveAndPersistSession(baseSession);
+
+    return {
+      session,
+      playEvent,
+    };
+  }
+
+  async recordCandidateQueued(
+    input: RecordCandidateQueuedInput
+  ): Promise<RecordCandidateQueuedResult> {
+    const occurredAtMs = input.occurredAtMs ?? Date.now();
+    const baseSession = await this.ensureSession(occurredAtMs);
+    const playEvent = buildCandidateQueuedEvent(
+      this.options.sessionId,
+      input.candidate,
+      occurredAtMs
+    );
+
+    await this.options.repositories.tracks.upsert(input.candidate.track);
+    await this.options.repositories.events.appendPlayEvent(playEvent);
+    const session = await this.deriveAndPersistSession(baseSession);
+
+    return {
+      session,
+      playEvent,
+    };
   }
 
   async getSession(): Promise<Session | null> {
@@ -193,6 +283,82 @@ function buildPlayEventId(
     'event',
     [sessionId, event.type, trackId, String(event.observedAtMs)].join('|')
   );
+}
+
+function buildFeedbackEvent(
+  sessionId: string,
+  input: RecordFeedbackInput,
+  occurredAtMs: number
+): FeedbackEvent {
+  return {
+    id: buildLocalId(
+      'feedback',
+      [sessionId, input.trackId, input.type, String(occurredAtMs)].join('|')
+    ),
+    sessionId,
+    trackId: input.trackId,
+    type: input.type,
+    occurredAt: new Date(occurredAtMs).toISOString(),
+    note: input.note,
+    metadata: {
+      source: 'desktop_lab',
+    },
+  };
+}
+
+function buildAutopilotEvent(
+  sessionId: string,
+  enabled: boolean,
+  occurredAtMs: number
+): PlayEvent {
+  const type: PlayEventType = enabled
+    ? 'autopilot_enabled'
+    : 'autopilot_disabled';
+
+  return {
+    id: buildLocalId(
+      'event',
+      [sessionId, type, String(occurredAtMs)].join('|')
+    ),
+    sessionId,
+    type,
+    occurredAt: new Date(occurredAtMs).toISOString(),
+    inferred: false,
+    confidence: 1,
+    metadata: {
+      source: 'desktop_lab',
+    },
+  };
+}
+
+function buildCandidateQueuedEvent(
+  sessionId: string,
+  candidate: RankedCandidate,
+  occurredAtMs: number
+): PlayEvent {
+  return {
+    id: buildLocalId(
+      'event',
+      [sessionId, 'candidate_queued', candidate.track.id, String(occurredAtMs)].join(
+        '|'
+      )
+    ),
+    sessionId,
+    trackId: candidate.track.id,
+    providerName: candidate.track.providerIds.spotify ? 'spotify' : undefined,
+    providerPlaybackId: candidate.track.providerIds.spotify,
+    type: 'candidate_queued',
+    occurredAt: new Date(occurredAtMs).toISOString(),
+    inferred: false,
+    confidence: 1,
+    metadata: {
+      source: 'desktop_up_next',
+      rank: candidate.rank,
+      score: candidate.score,
+      reasons: candidate.reasons.map(reason => reason.type),
+      warnings: candidate.warnings.map(warning => warning.type),
+    },
+  };
 }
 
 function buildLocalTrackId(event: PlaybackEvent): string {

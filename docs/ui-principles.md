@@ -406,6 +406,10 @@ Less like this
 Broke the mood
 ```
 
+In early personal mode builds, this visible set can live directly in the Liam
+panel as long as it writes real feedback events, updates session controls, and
+shows an immediate consequence message.
+
 Secondary menu:
 
 ```txt
@@ -444,6 +448,9 @@ Mood strictness increased.
 
 The user should feel that feedback has consequences.
 
+In Lab Mode, a short result message is enough at first if it clearly names the
+feedback, the affected track, and the control or session direction that changed.
+
 ---
 
 # Session controls
@@ -461,6 +468,9 @@ Autopilot
 ```
 
 These controls should be simple and legible.
+
+The first visible control can be a single Autopilot toggle plus compact readouts
+for mood strictness, exploration, repeat tolerance, and mainstream tolerance.
 
 Avoid exposing too many algorithm weights in normal mode.
 

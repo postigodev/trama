@@ -14,6 +14,8 @@ export const defaultSpotifyScopes = [
   'user-read-playback-state',
   'user-read-recently-played',
   'user-modify-playback-state',
+  'playlist-read-private',
+  'playlist-read-collaborative',
 ] as const;
 
 export interface SpotifyAuthConfig {

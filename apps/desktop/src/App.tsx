@@ -5,8 +5,8 @@
 
 import React, { useEffect, useRef, useState } from 'react';
 import { Activity, Headphones, Radio, RotateCcw } from 'lucide-react';
-import type { Session } from '@trama/core';
-import type { PlaybackState } from '@trama/spotify-adapter';
+import type { FeedbackType, RankedCandidate, Session } from '@trama/core';
+import { createSpotifyClient, type PlaybackState } from '@trama/spotify-adapter';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
@@ -33,6 +33,8 @@ import {
   createLocalSessionRecorder,
   type LocalSessionRecorder,
 } from '@/services/localSessionRecorder';
+import { buildRankedSpotifyCandidatePool } from '@/services/spotifyCandidatePool';
+import { loadUsableSpotifyToken } from '@/services/spotifyRuntime';
 import {
   createDesktopRepositories,
   getLocalDbStatus,
@@ -53,6 +55,17 @@ export function App(): React.JSX.Element {
   const [playbackEvents, setPlaybackEvents] = useState<PlaybackEvent[]>([]);
   const [localSession, setLocalSession] = useState<Session | null>(null);
   const [localDbPath, setLocalDbPath] = useState<string | null>(null);
+  const [liamBusy, setLiamBusy] = useState(false);
+  const [liamStatusMessage, setLiamStatusMessage] = useState<string | null>(null);
+  const [candidatePoolBusy, setCandidatePoolBusy] = useState(false);
+  const [candidatePoolStatus, setCandidatePoolStatus] = useState<string | null>(null);
+  const [rankedCandidates, setRankedCandidates] = useState<RankedCandidate[]>([]);
+  const [queueCandidateBusy, setQueueCandidateBusy] = useState(false);
+  const [candidateSourceSummary, setCandidateSourceSummary] = useState<{
+    recentlyPlayedCount: number;
+    playlistCount: number;
+    playlistTrackCount: number;
+  } | null>(null);
   const observedPlaybackRef = useRef<ObservedPlayback | null>(null);
   const playbackEventsRef = useRef<PlaybackEvent[]>([]);
   const sessionRecorderRef = useRef<LocalSessionRecorder | null>(null);
@@ -111,6 +124,135 @@ export function App(): React.JSX.Element {
     } finally {
       setReadingLocalSession(false);
     }
+  }
+
+  async function handleFeedback(type: FeedbackType): Promise<void> {
+    const sessionRecorder = sessionRecorderRef.current;
+    const trackId = localSession?.currentTrackId;
+
+    if (!sessionRecorder || !trackId) {
+      setLiamStatusMessage('No active session track yet. Start playback and observe it first.');
+      return;
+    }
+
+    setLiamBusy(true);
+    setLiamStatusMessage(null);
+
+    try {
+      const result = await sessionRecorder.recordFeedback({
+        trackId,
+        type,
+      });
+      setLocalSession(result.session);
+      setLiamStatusMessage(
+        buildFeedbackStatusMessage(type, displayTitle, result.session)
+      );
+    } catch (error) {
+      setLiamStatusMessage(
+        error instanceof Error ? error.message : String(error)
+      );
+    } finally {
+      setLiamBusy(false);
+    }
+  }
+
+  async function handleToggleAutopilot(): Promise<void> {
+    const sessionRecorder = sessionRecorderRef.current;
+    if (!sessionRecorder) {
+      return;
+    }
+
+    setLiamBusy(true);
+    setLiamStatusMessage(null);
+
+    try {
+      const nextEnabled = !localSession?.controls.autopilotEnabled;
+      const result = await sessionRecorder.recordAutopilotChange(nextEnabled);
+      setLocalSession(result.session);
+      setLiamStatusMessage(
+        nextEnabled
+          ? 'Autopilot enabled. Future queue actions should be recorded visibly.'
+          : 'Autopilot disabled. Liam is back to observation mode.'
+      );
+    } catch (error) {
+      setLiamStatusMessage(
+        error instanceof Error ? error.message : String(error)
+      );
+    } finally {
+      setLiamBusy(false);
+    }
+  }
+
+  async function handleBuildCandidatePool(): Promise<void> {
+    if (!localSession) {
+      setCandidatePoolStatus(
+        'No local session yet. Observe playback first so Trama has context.'
+      );
+      return;
+    }
+
+    setCandidatePoolBusy(true);
+    setCandidatePoolStatus(null);
+
+    try {
+      const result = await buildRankedSpotifyCandidatePool(localSession);
+      setRankedCandidates(result.rankedCandidates);
+      setCandidateSourceSummary(result.sourceSummary);
+      setCandidatePoolStatus(
+        `Built ${result.candidatePool.length} candidates from ${result.sourceSummary.recentlyPlayedCount} recent tracks and ${result.sourceSummary.playlistCount} playlists.`
+      );
+    } catch (error) {
+      setCandidatePoolStatus(
+        error instanceof Error ? error.message : String(error)
+      );
+    } finally {
+      setCandidatePoolBusy(false);
+    }
+  }
+
+  async function handleQueueCandidate(candidate: RankedCandidate): Promise<void> {
+    const sessionRecorder = sessionRecorderRef.current;
+    const spotifyUri = candidate.track.providerIds.spotify;
+
+    if (!sessionRecorder) {
+      return;
+    }
+
+    if (!spotifyUri) {
+      setCandidatePoolStatus(
+        `Can't queue "${candidate.track.title}" because it has no Spotify URI.`
+      );
+      return;
+    }
+
+    setQueueCandidateBusy(true);
+    setCandidatePoolStatus(null);
+
+    try {
+      const token = await loadUsableSpotifyToken();
+      await createSpotifyClient(token.accessToken).addToQueue(spotifyUri);
+      const result = await sessionRecorder.recordCandidateQueued({ candidate });
+      setLocalSession(result.session);
+      setCandidatePoolStatus(
+        `Queued "${candidate.track.title}" on Spotify from Up Next.`
+      );
+    } catch (error) {
+      setCandidatePoolStatus(
+        error instanceof Error ? error.message : String(error)
+      );
+    } finally {
+      setQueueCandidateBusy(false);
+    }
+  }
+
+  async function handleQueueTopCandidate(): Promise<void> {
+    const topCandidate = rankedCandidates[0];
+    if (!topCandidate) {
+      setCandidatePoolStatus('Build a candidate pool first so Liam has something to queue.');
+      return;
+    }
+
+    await handleQueueCandidate(topCandidate);
   }
 
   useEffect(() => {
@@ -315,8 +457,27 @@ export function App(): React.JSX.Element {
 
         <div className="grid gap-4 xl:grid-cols-[320px_1fr_320px]">
           <div className="flex flex-col gap-4">
-            <LiamPanel connected={connected} hasPlayback={hasObservedTrack} />
-            <UpNextPanel />
+            <LiamPanel
+              connected={connected}
+              hasPlayback={hasObservedTrack}
+              session={localSession}
+              currentTrackTitle={displayTitle}
+              canFeedback={Boolean(localSession?.currentTrackId)}
+              busy={liamBusy}
+              statusMessage={liamStatusMessage}
+              onFeedback={handleFeedback}
+              onToggleAutopilot={handleToggleAutopilot}
+            />
+            <UpNextPanel
+              rankedCandidates={rankedCandidates}
+              busy={candidatePoolBusy}
+              queueBusy={queueCandidateBusy}
+              statusMessage={candidatePoolStatus}
+              onRefresh={handleBuildCandidatePool}
+              onQueueTopCandidate={handleQueueTopCandidate}
+              onQueueCandidate={handleQueueCandidate}
+              sourceSummary={candidateSourceSummary}
+            />
           </div>
 
           <SpotifyAuthLab
@@ -355,4 +516,25 @@ function formatDuration(milliseconds: number): string {
   const minutes = Math.floor(totalSeconds / 60);
   const seconds = totalSeconds % 60;
   return `${minutes}:${seconds.toString().padStart(2, '0')}`;
+}
+
+function buildFeedbackStatusMessage(
+  type: FeedbackType,
+  title: string,
+  session: Session
+): string {
+  switch (type) {
+    case 'fire':
+      return `Marked "${title}" as Fire. Accepted artists now influence this session more strongly.`;
+    case 'more_like_this':
+      return `Marked "${title}" as More like this. Similar tracks should feel safer next.`;
+    case 'less_like_this':
+      return `Marked "${title}" as Less like this. Liam will push away from this track's lane.`;
+    case 'broke_the_mood':
+      return `Marked "${title}" as Broke the mood. Mood strictness is now ${Math.round(
+        session.controls.moodStrictness * 100
+      )}%.`;
+    default:
+      return `Recorded ${type} for "${title}".`;
+  }
 }

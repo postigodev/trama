@@ -125,4 +125,68 @@ describe('@trama/spotify-adapter - client', () => {
 
     vi.unstubAllGlobals();
   });
+
+  it('loads recently played tracks from Spotify', async () => {
+    const fetchMock = vi.fn<typeof fetch>(async () => {
+      return new Response(
+        JSON.stringify({
+          items: [
+            {
+              played_at: '2026-01-01T00:00:00.000Z',
+              track: {
+                id: 'track-1',
+                name: 'Track 1',
+                uri: 'spotify:track:track-1',
+                duration_ms: 180000,
+                artists: [{ id: 'artist-1', name: 'Artist 1', uri: 'spotify:artist:artist-1' }],
+              },
+            },
+          ],
+        }),
+        { status: 200 }
+      );
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const items = await createSpotifyClient('access-token').getRecentlyPlayed(5);
+
+    expect(items).toHaveLength(1);
+    expect(items[0]?.id).toBe('track-1');
+    expect(fetchMock).toHaveBeenCalledWith(
+      'https://api.spotify.com/v1/me/player/recently-played?limit=5',
+      {
+        headers: {
+          authorization: 'Bearer access-token',
+        },
+      }
+    );
+
+    vi.unstubAllGlobals();
+  });
+
+  it('loads user playlists from Spotify', async () => {
+    const fetchMock = vi.fn<typeof fetch>(async () => {
+      return new Response(
+        JSON.stringify({
+          items: [
+            {
+              id: 'playlist-1',
+              name: 'Playlist 1',
+              uri: 'spotify:playlist:playlist-1',
+            },
+          ],
+          next: null,
+        }),
+        { status: 200 }
+      );
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const playlists = await createSpotifyClient('access-token').getCurrentUserPlaylists(5);
+
+    expect(playlists).toHaveLength(1);
+    expect(playlists[0]?.id).toBe('playlist-1');
+
+    vi.unstubAllGlobals();
+  });
 });

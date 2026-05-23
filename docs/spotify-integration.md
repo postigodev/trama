@@ -414,6 +414,17 @@ Candidate generation should produce `CandidateTrack[]`.
 
 Ranking should happen in `packages/core`.
 
+Current desktop personal mode now builds a first real candidate pool from:
+
+```txt
+recently played tracks
+tracks from the user's own playlists
+```
+
+The desktop app treats both sources as equal pool contributors, deduplicates by
+track ID, preserves source references, and only then passes the normalized pool
+into the ranking engine.
+
 ---
 
 ## Avoid unavailable or restricted assumptions
@@ -633,6 +644,15 @@ These actions control what Spotify plays, but they do not control Spotify Mix
 transition curves, EQ, fade length, waveform anchors, or internal audio DSP.
 Queue/control failures should surface provider recovery steps such as missing
 Premium, no active device, or expired auth.
+
+Current desktop Lab Mode supports queueing the top ranked `Up Next` candidate
+directly from the candidate list. A successful queue action should:
+
+```txt
+send POST /me/player/queue through the Spotify adapter
+record a local candidate_queued play event
+leave ranking logic inside packages/core
+```
 
 ---
 

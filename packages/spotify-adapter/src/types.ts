@@ -71,6 +71,22 @@ export interface PlaybackState {
   observedAt: string;
 }
 
+export interface SpotifyRecentlyPlayedItem {
+  track: SpotifyTrackObject;
+  played_at: string;
+}
+
+export interface SpotifyPlaylistObject {
+  id: string;
+  name: string;
+  uri: string;
+  images?: SpotifyImage[];
+}
+
+export interface SpotifyPlaylistTrackItem {
+  track?: SpotifyTrackObject | null;
+}
+
 export type SpotifyAdapterError =
   | 'SPOTIFY_NOT_CONNECTED'
   | 'SPOTIFY_TOKEN_EXPIRED'

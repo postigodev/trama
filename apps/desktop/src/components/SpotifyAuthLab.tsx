@@ -16,7 +16,6 @@ import {
   exchangeCode,
   mapSpotifyPlaybackToPlaybackState,
   prepareAuthorizationRequest,
-  refreshAccessToken,
   statusSummary,
   type SpotifyAuthConfig,
   type SpotifyTokenResponse,
@@ -43,13 +42,12 @@ import {
   finishSpotifyAuthInTauri,
   getSpotifyAuthStatusFromTauri,
   getSpotifyTokenStatusFromTauri,
-  loadSpotifyTokenFromTauri,
   saveSpotifyTokenInTauri,
   startSpotifyAuthInTauri,
-  type TauriSpotifyCachedToken,
   type TauriSpotifyAuthStatus,
   type TauriSpotifyTokenStatus,
 } from '@/services/tauriSpotifyAuthCommands';
+import { getSpotifyRuntimeConfig, loadUsableSpotifyToken } from '@/services/spotifyRuntime';
 import {
   loadSpotifyLabSettings,
   saveSpotifyLabSettings,
@@ -70,9 +68,7 @@ interface SpotifyAuthLabProps {
   onPlaybackChange?: (playback: PlaybackState | null) => void;
 }
 
-const defaultRedirectUri =
-  import.meta.env.VITE_SPOTIFY_REDIRECT_URI ??
-  'http://127.0.0.1:5173/auth/spotify/callback';
+const defaultRedirectUri = getSpotifyRuntimeConfig().redirectUri;
 
 export function SpotifyAuthLab({
   className,
@@ -233,7 +229,7 @@ export function SpotifyAuthLab({
     setMessage(null);
 
     try {
-      const token = await loadUsableToken();
+      const token = await loadUsableSpotifyToken();
       const client = createSpotifyClient(token.accessToken);
       const spotifyPlayback = await client.getCurrentPlayback();
       const normalizedPlayback = mapSpotifyPlaybackToPlaybackState(
@@ -280,7 +276,7 @@ export function SpotifyAuthLab({
     setMessage(null);
 
     try {
-      const token = await loadUsableToken();
+      const token = await loadUsableSpotifyToken();
       await createSpotifyClient(token.accessToken).addToQueue(queueUri);
       setMessage(`Liam queued ${queueUri.trim()}.`);
       setQueueUri('');
@@ -299,7 +295,7 @@ export function SpotifyAuthLab({
     setMessage(null);
 
     try {
-      const token = await loadUsableToken();
+      const token = await loadUsableSpotifyToken();
       const client = createSpotifyClient(token.accessToken);
 
       if (action === 'pause') await client.pausePlayback();
@@ -313,41 +309,6 @@ export function SpotifyAuthLab({
     } finally {
       setBusyAction(null);
     }
-  }
-
-  async function loadUsableToken(): Promise<TauriSpotifyCachedToken> {
-    const cached = await loadSpotifyTokenFromTauri();
-    if (!cached) {
-      throw new Error('Spotify is not connected. Authenticate first.');
-    }
-
-    if (!isTokenExpired(cached.expiresAt)) {
-      return cached;
-    }
-
-    if (!cached.refreshToken) {
-      throw new Error('Spotify session expired. Re-authenticate Spotify to continue.');
-    }
-
-    const refreshed = await refreshAccessToken({
-      ...config,
-      refreshToken: cached.refreshToken,
-    });
-    const savedAt = new Date();
-    const expiresAt = new Date(
-      savedAt.getTime() + refreshed.expiresIn * 1000
-    ).toISOString();
-    const tokenToSave = {
-      accessToken: refreshed.accessToken,
-      tokenType: refreshed.tokenType,
-      expiresAt,
-      refreshToken: refreshed.refreshToken ?? cached.refreshToken,
-      scope: refreshed.scope ?? cached.scope,
-      savedAt: savedAt.toISOString(),
-    };
-
-    setTokenStatus(await saveSpotifyTokenInTauri(tokenToSave));
-    return tokenToSave;
   }
 
   async function cancelAuth(): Promise<void> {
@@ -713,15 +674,6 @@ function toErrorMessage(error: unknown): string {
   }
 
   return String(error);
-}
-
-function isTokenExpired(expiresAt: string): boolean {
-  const expiry = Date.parse(expiresAt);
-  if (Number.isNaN(expiry)) {
-    return true;
-  }
-
-  return expiry - Date.now() <= 60_000;
 }
 
 function formatDateTime(value: string): string {
