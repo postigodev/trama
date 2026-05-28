@@ -164,6 +164,39 @@ describe('@trama/spotify-adapter - client', () => {
     vi.unstubAllGlobals();
   });
 
+  it('loads the current Spotify queue', async () => {
+    const fetchMock = vi.fn<typeof fetch>(async () => {
+      return new Response(
+        JSON.stringify({
+          queue: [
+            {
+              id: 'track-queued',
+              name: 'Queued Track',
+              uri: 'spotify:track:track-queued',
+              duration_ms: 180000,
+              artists: [
+                {
+                  id: 'artist-queued',
+                  name: 'Queued Artist',
+                  uri: 'spotify:artist:artist-queued',
+                },
+              ],
+            },
+          ],
+        }),
+        { status: 200 }
+      );
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const items = await createSpotifyClient('access-token').getQueue();
+
+    expect(items).toHaveLength(1);
+    expect(items[0]?.uri).toBe('spotify:track:track-queued');
+
+    vi.unstubAllGlobals();
+  });
+
   it('loads user playlists from Spotify', async () => {
     const fetchMock = vi.fn<typeof fetch>(async () => {
       return new Response(

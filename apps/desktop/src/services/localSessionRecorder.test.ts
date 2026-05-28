@@ -200,6 +200,23 @@ describe('@trama/desktop - local session recorder', () => {
 
     expect(events.at(-1)?.type).toBe('candidate_queued');
     expect(events.at(-1)?.providerPlaybackId).toBe('spotify:track:track-queued');
+    expect(events.at(-1)?.metadata?.source).toBe('desktop_up_next');
     expect(result.session.recentTrackIds[0]).toBe('track-queued');
+  });
+
+  it('records autopilot queue actions with autopilot metadata', async () => {
+    const repositories = createInMemoryRepositories();
+    const recorder = createLocalSessionRecorder({
+      repositories,
+      sessionId: 'session-1',
+    });
+
+    const result = await recorder.recordCandidateQueued({
+      candidate: rankedCandidate('track-autopilot'),
+      occurredAtMs: 1770000025000,
+      source: 'desktop_autopilot',
+    });
+
+    expect(result.playEvent.metadata?.source).toBe('desktop_autopilot');
   });
 });

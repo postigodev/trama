@@ -57,7 +57,11 @@ export function LiamPanel({
           </div>
           <div className="flex items-center gap-2">
             <SlidersHorizontal data-icon="inline-start" />
-            <span>Transition scoring comes after playback events.</span>
+            <span>
+              {controls?.autopilotEnabled
+                ? 'Autopilot waits until the track is mostly through before queueing one top pick.'
+                : 'Transition scoring comes after playback events.'}
+            </span>
           </div>
         </div>
 

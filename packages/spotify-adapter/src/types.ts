@@ -87,6 +87,11 @@ export interface SpotifyPlaylistTrackItem {
   track?: SpotifyTrackObject | null;
 }
 
+export interface SpotifyQueueResponse {
+  currently_playing?: SpotifyTrackObject | null;
+  queue?: SpotifyTrackObject[];
+}
+
 export type SpotifyAdapterError =
   | 'SPOTIFY_NOT_CONNECTED'
   | 'SPOTIFY_TOKEN_EXPIRED'

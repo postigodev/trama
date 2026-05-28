@@ -689,6 +689,16 @@ respect cooldowns and user settings
 record queue actions as events
 ```
 
+The current desktop autopilot is intentionally conservative:
+
+```txt
+only runs when autoplay is enabled in session controls
+waits until the observed local track is around 70% complete
+rebuilds the real Spotify candidate pool at decision time
+queues at most one top pick per current track
+backs off after provider failures with a cooldown
+```
+
 Autopilot should be easy to disable.
 
 It should never hide what it is doing.

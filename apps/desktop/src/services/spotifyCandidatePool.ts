@@ -10,6 +10,7 @@ export interface SpotifyCandidatePoolResult {
   generatedAt: string;
   candidatePool: CandidateTrack[];
   rankedCandidates: RankedCandidate[];
+  queuedTrackUris: string[];
   sourceSummary: {
     recentlyPlayedCount: number;
     playlistCount: number;
@@ -30,9 +31,10 @@ export async function buildRankedSpotifyCandidatePool(
     const client = createSpotifyClient(token.accessToken);
     const generatedAt = new Date().toISOString();
 
-    const [recentlyPlayedTracks, playlists] = await Promise.all([
+    const [recentlyPlayedTracks, playlists, queuedTracks] = await Promise.all([
       client.getRecentlyPlayed(recentlyPlayedTarget),
       client.getCurrentUserPlaylists(playlistFetchLimit),
+      client.getQueue(),
     ]);
 
     const playlistTracksByPlaylist = await Promise.all(
@@ -75,6 +77,9 @@ export async function buildRankedSpotifyCandidatePool(
       generatedAt,
       rankedCandidates: rankCandidates(candidatePool, session),
       candidatePool,
+      queuedTrackUris: queuedTracks
+        .map(track => track.uri)
+        .filter((uri): uri is string => typeof uri === 'string' && uri.length > 0),
       sourceSummary: {
         recentlyPlayedCount: recentlyPlayedTracks.length,
         playlistCount: playlists.length,

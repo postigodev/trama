@@ -8,6 +8,7 @@ import { Separator } from '@/components/ui/separator';
 
 interface UpNextPanelProps {
   rankedCandidates: RankedCandidate[];
+  queuedTrackUris?: string[];
   busy?: boolean;
   queueBusy?: boolean;
   statusMessage?: string | null;
@@ -23,6 +24,7 @@ interface UpNextPanelProps {
 
 export function UpNextPanel({
   rankedCandidates,
+  queuedTrackUris = [],
   busy = false,
   queueBusy = false,
   statusMessage,
@@ -31,6 +33,11 @@ export function UpNextPanel({
   onQueueCandidate,
   sourceSummary,
 }: UpNextPanelProps): React.JSX.Element {
+  const topCandidate = rankedCandidates[0];
+  const topCandidateQueued = topCandidate
+    ? queuedTrackUris.includes(topCandidate.track.providerIds.spotify ?? '')
+    : false;
+
   return (
     <Card>
       <CardHeader>
@@ -65,7 +72,8 @@ export function UpNextPanel({
               !onQueueTopCandidate ||
               queueBusy ||
               busy ||
-              rankedCandidates.length === 0
+              rankedCandidates.length === 0 ||
+              topCandidateQueued
             }
           >
             {queueBusy ? (
@@ -73,7 +81,7 @@ export function UpNextPanel({
             ) : (
               <Plus data-icon="inline-start" />
             )}
-            Queue top pick
+            {topCandidateQueued ? 'Already queued' : 'Queue top pick'}
           </Button>
         </div>
 
@@ -122,6 +130,9 @@ export function UpNextPanel({
                 </div>
               </div>
               <div className="mt-2 flex flex-wrap gap-2">
+                {queuedTrackUris.includes(candidate.track.providerIds.spotify ?? '') ? (
+                  <Badge variant="secondary">already queued</Badge>
+                ) : null}
                 {candidate.reasons.slice(0, 2).map(reason => (
                   <Badge key={reason.id} variant="outline">
                     {reason.type.replace(/_/g, ' ')}
@@ -137,11 +148,18 @@ export function UpNextPanel({
                 <Button
                   variant="outline"
                   size="sm"
-                  disabled={!onQueueCandidate || queueBusy || busy}
+                  disabled={
+                    !onQueueCandidate ||
+                    queueBusy ||
+                    busy ||
+                    queuedTrackUris.includes(candidate.track.providerIds.spotify ?? '')
+                  }
                   onClick={() => void onQueueCandidate?.(candidate)}
                 >
                   <Plus data-icon="inline-start" />
-                  Queue
+                  {queuedTrackUris.includes(candidate.track.providerIds.spotify ?? '')
+                    ? 'Queued'
+                    : 'Queue'}
                 </Button>
               </div>
             </div>

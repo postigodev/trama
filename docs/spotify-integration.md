@@ -654,6 +654,22 @@ record a local candidate_queued play event
 leave ranking logic inside packages/core
 ```
 
+Before queueing from `Up Next`, the desktop app should also read the current
+Spotify queue so it can avoid inserting obvious duplicates and mark already
+queued candidates in the UI.
+
+Current desktop Autopilot uses the same queue path with extra guardrails:
+
+```txt
+observe Spotify Desktop locally through the OS media session
+wait until the current track is roughly 70% complete
+rebuild the Spotify-backed candidate pool
+queue only the current top ranked candidate
+skip the action if that candidate is already in the Spotify queue
+record candidate_queued locally with autopilot metadata
+cool down after repeated provider failures instead of retrying aggressively
+```
+
 ---
 
 ## Local configuration

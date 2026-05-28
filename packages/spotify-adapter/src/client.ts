@@ -6,12 +6,14 @@ import type {
   SpotifyCurrentlyPlayingResponse,
   SpotifyPlaylistObject,
   SpotifyPlaylistTrackItem,
+  SpotifyQueueResponse,
   SpotifyRecentlyPlayedItem,
   SpotifyTrackObject,
 } from './types';
 
 export interface SpotifyClient {
   getCurrentPlayback: () => Promise<SpotifyCurrentlyPlayingResponse | null>;
+  getQueue: () => Promise<SpotifyTrackObject[]>;
   getRecentlyPlayed: (limit?: number) => Promise<SpotifyTrackObject[]>;
   getCurrentUserPlaylists: (limit?: number) => Promise<SpotifyPlaylistObject[]>;
   getPlaylistTracks: (
@@ -36,6 +38,13 @@ export function createSpotifyClient(_accessToken: string): SpotifyClient {
       getJsonOrNull<SpotifyCurrentlyPlayingResponse>(
         'https://api.spotify.com/v1/me/player'
       ),
+    getQueue: async () => {
+      const response = await getJson<SpotifyQueueResponse>(
+        'https://api.spotify.com/v1/me/player/queue'
+      );
+
+      return (response.queue ?? []).filter(isSpotifyTrackObject);
+    },
     getRecentlyPlayed: async (limit = 20) => {
       const response = await getJson<{
         items?: SpotifyRecentlyPlayedItem[];

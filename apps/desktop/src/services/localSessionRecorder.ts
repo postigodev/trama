@@ -37,6 +37,7 @@ export interface RecordAutopilotChangeResult {
 export interface RecordCandidateQueuedInput {
   candidate: RankedCandidate;
   occurredAtMs?: number;
+  source?: 'desktop_up_next' | 'desktop_autopilot';
 }
 
 export interface RecordCandidateQueuedResult {
@@ -147,7 +148,8 @@ export class LocalSessionRecorder {
     const playEvent = buildCandidateQueuedEvent(
       this.options.sessionId,
       input.candidate,
-      occurredAtMs
+      occurredAtMs,
+      input.source
     );
 
     await this.options.repositories.tracks.upsert(input.candidate.track);
@@ -334,7 +336,8 @@ function buildAutopilotEvent(
 function buildCandidateQueuedEvent(
   sessionId: string,
   candidate: RankedCandidate,
-  occurredAtMs: number
+  occurredAtMs: number,
+  source = 'desktop_up_next'
 ): PlayEvent {
   return {
     id: buildLocalId(
@@ -352,7 +355,7 @@ function buildCandidateQueuedEvent(
     inferred: false,
     confidence: 1,
     metadata: {
-      source: 'desktop_up_next',
+      source,
       rank: candidate.rank,
       score: candidate.score,
       reasons: candidate.reasons.map(reason => reason.type),

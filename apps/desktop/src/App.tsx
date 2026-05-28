@@ -21,6 +21,7 @@ import { EventTimeline } from '@/components/EventTimeline';
 import { SpotifyAuthLab } from '@/components/SpotifyAuthLab';
 import { UpNextPanel } from '@/components/UpNextPanel';
 import { WaveformBars } from '@/components/WaveformBars';
+import { createSpotifyAutopilotController } from '@/services/autopilot';
 import {
   getCurrentMediaSession,
   type ObservedPlayback,
@@ -61,18 +62,46 @@ export function App(): React.JSX.Element {
   const [candidatePoolStatus, setCandidatePoolStatus] = useState<string | null>(null);
   const [rankedCandidates, setRankedCandidates] = useState<RankedCandidate[]>([]);
   const [queueCandidateBusy, setQueueCandidateBusy] = useState(false);
+  const [queuedTrackUris, setQueuedTrackUris] = useState<string[]>([]);
   const [candidateSourceSummary, setCandidateSourceSummary] = useState<{
     recentlyPlayedCount: number;
     playlistCount: number;
     playlistTrackCount: number;
   } | null>(null);
+  const localSessionRef = useRef<Session | null>(null);
+  const queuedTrackUrisRef = useRef<string[]>([]);
   const observedPlaybackRef = useRef<ObservedPlayback | null>(null);
   const playbackEventsRef = useRef<PlaybackEvent[]>([]);
+  const autopilotRunningRef = useRef(false);
   const sessionRecorderRef = useRef<LocalSessionRecorder | null>(null);
   if (!sessionRecorderRef.current) {
     sessionRecorderRef.current = createLocalSessionRecorder({
       repositories: createDesktopRepositories(),
       sessionId: localSessionId,
+    });
+  }
+  const autopilotControllerRef = useRef<ReturnType<
+    typeof createSpotifyAutopilotController
+  > | null>(null);
+  if (!autopilotControllerRef.current) {
+    autopilotControllerRef.current = createSpotifyAutopilotController({
+      buildCandidatePool: buildRankedSpotifyCandidatePool,
+      queueSpotifyTrack: async spotifyUri => {
+        const token = await loadUsableSpotifyToken();
+        await createSpotifyClient(token.accessToken).addToQueue(spotifyUri);
+      },
+      recordCandidateQueued: async (candidate, occurredAtMs) => {
+        const sessionRecorder = sessionRecorderRef.current;
+        if (!sessionRecorder) {
+          throw new Error('Autopilot recorder is not ready yet.');
+        }
+
+        return sessionRecorder.recordCandidateQueued({
+          candidate,
+          occurredAtMs,
+          source: 'desktop_autopilot',
+        });
+      },
     });
   }
   const hasTrack = Boolean(playback?.track);
@@ -95,6 +124,109 @@ export function App(): React.JSX.Element {
       : observedPlayback?.positionMs;
   const displayDuration = playback?.durationMs ?? observedPlayback?.durationMs;
 
+  function syncLocalSession(session: Session | null): void {
+    localSessionRef.current = session;
+    setLocalSession(session);
+  }
+
+  function syncQueuedTrackUris(nextUris: string[]): void {
+    const uniqueUris = [...new Set(nextUris)];
+    queuedTrackUrisRef.current = uniqueUris;
+    setQueuedTrackUris(uniqueUris);
+  }
+
+  function applyCandidatePoolSnapshot(input: {
+    rankedCandidates: RankedCandidate[];
+    queuedTrackUris: string[];
+    sourceSummary: {
+      recentlyPlayedCount: number;
+      playlistCount: number;
+      playlistTrackCount: number;
+    };
+  }): void {
+    setRankedCandidates(input.rankedCandidates);
+    syncQueuedTrackUris(input.queuedTrackUris);
+    setCandidateSourceSummary(input.sourceSummary);
+  }
+
+  async function queueCandidateOnSpotify(
+    candidate: RankedCandidate,
+    source: 'desktop_up_next' | 'desktop_autopilot'
+  ): Promise<Session> {
+    const sessionRecorder = sessionRecorderRef.current;
+    const spotifyUri = candidate.track.providerIds.spotify;
+
+    if (!sessionRecorder) {
+      throw new Error('Session recorder is not ready yet.');
+    }
+
+    if (!spotifyUri) {
+      throw new Error(
+        `Can't queue "${candidate.track.title}" because it has no Spotify URI.`
+      );
+    }
+
+    if (queuedTrackUrisRef.current.includes(spotifyUri)) {
+      throw new Error(`"${candidate.track.title}" is already in the Spotify queue.`);
+    }
+
+    const token = await loadUsableSpotifyToken();
+    await createSpotifyClient(token.accessToken).addToQueue(spotifyUri);
+    const result = await sessionRecorder.recordCandidateQueued({
+      candidate,
+      source,
+    });
+    syncLocalSession(result.session);
+    syncQueuedTrackUris([...queuedTrackUrisRef.current, spotifyUri]);
+    return result.session;
+  }
+
+  async function maybeRunAutopilot(
+    nextPlayback: ObservedPlayback | null,
+    session: Session | null
+  ): Promise<void> {
+    const controller = autopilotControllerRef.current;
+    if (
+      !controller ||
+      autopilotRunningRef.current ||
+      queueCandidateBusy ||
+      candidatePoolBusy ||
+      liamBusy
+    ) {
+      return;
+    }
+
+    autopilotRunningRef.current = true;
+
+    try {
+      const result = await controller.run({
+        session,
+        observedPlayback: nextPlayback,
+      });
+
+      if (result.rankedCandidates && result.queuedTrackUris && result.sourceSummary) {
+        applyCandidatePoolSnapshot({
+          rankedCandidates: result.rankedCandidates,
+          queuedTrackUris: result.queuedTrackUris,
+          sourceSummary: result.sourceSummary,
+        });
+      }
+
+      if (result.session) {
+        syncLocalSession(result.session);
+      }
+
+      if (result.message) {
+        setLiamStatusMessage(result.message);
+        if (result.status !== 'idle') {
+          setCandidatePoolStatus(result.message);
+        }
+      }
+    } finally {
+      autopilotRunningRef.current = false;
+    }
+  }
+
   async function readLocalMediaSession(): Promise<void> {
     setReadingLocalSession(true);
     setLocalObserverError(null);
@@ -104,6 +236,7 @@ export function App(): React.JSX.Element {
       const next = await getCurrentMediaSession();
       observedPlaybackRef.current = next;
       setObservedPlayback(next);
+      let session = localSessionRef.current;
 
       const newEvents = inferPlaybackEvents(previous, next, {
         recentEvents: playbackEventsRef.current,
@@ -117,8 +250,11 @@ export function App(): React.JSX.Element {
           .slice(0, 12);
         playbackEventsRef.current = updatedEvents;
         setPlaybackEvents(updatedEvents);
-        setLocalSession(await sessionRecorder.recordEvents(newEvents));
+        session = await sessionRecorder.recordEvents(newEvents);
+        syncLocalSession(session);
       }
+
+      await maybeRunAutopilot(next, session);
     } catch (error) {
       setLocalObserverError(error instanceof Error ? error.message : String(error));
     } finally {
@@ -143,7 +279,7 @@ export function App(): React.JSX.Element {
         trackId,
         type,
       });
-      setLocalSession(result.session);
+      syncLocalSession(result.session);
       setLiamStatusMessage(
         buildFeedbackStatusMessage(type, displayTitle, result.session)
       );
@@ -168,7 +304,7 @@ export function App(): React.JSX.Element {
     try {
       const nextEnabled = !localSession?.controls.autopilotEnabled;
       const result = await sessionRecorder.recordAutopilotChange(nextEnabled);
-      setLocalSession(result.session);
+      syncLocalSession(result.session);
       setLiamStatusMessage(
         nextEnabled
           ? 'Autopilot enabled. Future queue actions should be recorded visibly.'
@@ -196,10 +332,9 @@ export function App(): React.JSX.Element {
 
     try {
       const result = await buildRankedSpotifyCandidatePool(localSession);
-      setRankedCandidates(result.rankedCandidates);
-      setCandidateSourceSummary(result.sourceSummary);
+      applyCandidatePoolSnapshot(result);
       setCandidatePoolStatus(
-        `Built ${result.candidatePool.length} candidates from ${result.sourceSummary.recentlyPlayedCount} recent tracks and ${result.sourceSummary.playlistCount} playlists.`
+        `Built ${result.candidatePool.length} candidates from ${result.sourceSummary.recentlyPlayedCount} recent tracks and ${result.sourceSummary.playlistCount} playlists. Queue has ${result.queuedTrackUris.length} item${result.queuedTrackUris.length === 1 ? '' : 's'}.`
       );
     } catch (error) {
       setCandidatePoolStatus(
@@ -211,12 +346,7 @@ export function App(): React.JSX.Element {
   }
 
   async function handleQueueCandidate(candidate: RankedCandidate): Promise<void> {
-    const sessionRecorder = sessionRecorderRef.current;
     const spotifyUri = candidate.track.providerIds.spotify;
-
-    if (!sessionRecorder) {
-      return;
-    }
 
     if (!spotifyUri) {
       setCandidatePoolStatus(
@@ -225,14 +355,16 @@ export function App(): React.JSX.Element {
       return;
     }
 
+    if (queuedTrackUrisRef.current.includes(spotifyUri)) {
+      setCandidatePoolStatus(`"${candidate.track.title}" is already in the Spotify queue.`);
+      return;
+    }
+
     setQueueCandidateBusy(true);
     setCandidatePoolStatus(null);
 
     try {
-      const token = await loadUsableSpotifyToken();
-      await createSpotifyClient(token.accessToken).addToQueue(spotifyUri);
-      const result = await sessionRecorder.recordCandidateQueued({ candidate });
-      setLocalSession(result.session);
+      await queueCandidateOnSpotify(candidate, 'desktop_up_next');
       setCandidatePoolStatus(
         `Queued "${candidate.track.title}" on Spotify from Up Next.`
       );
@@ -275,7 +407,7 @@ export function App(): React.JSX.Element {
 
         playbackEventsRef.current = persistedState.playbackEvents;
         setPlaybackEvents(persistedState.playbackEvents);
-        setLocalSession(persistedState.session);
+        syncLocalSession(persistedState.session);
         setLocalDbPath(dbStatus?.dbPath ?? null);
       } catch (error) {
         if (cancelled) {
@@ -470,6 +602,7 @@ export function App(): React.JSX.Element {
             />
             <UpNextPanel
               rankedCandidates={rankedCandidates}
+              queuedTrackUris={queuedTrackUris}
               busy={candidatePoolBusy}
               queueBusy={queueCandidateBusy}
               statusMessage={candidatePoolStatus}
